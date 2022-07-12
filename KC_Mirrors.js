@@ -1102,8 +1102,13 @@ KCDev.Mirrors = {};
                         r.y += $gameMap.height() * tileH;
                     }
 
-                    let scale = (distToWall- 1) / parameters.maxWallDistance;
-                    scale = (scale < 0) ? 1 : 1 - scale;
+                    let scale = 1 - (distToWall - 1) / parameters.maxWallDistance;
+                    if (scale > 1) {
+                        scale = 1;
+                    }
+                    else if (scale < 0) {
+                        scale = 0;
+                    }
 
                     r.scale.x = this.scale.x * -1 * scale;
                     r.scale.y = this.scale.y * scale;
