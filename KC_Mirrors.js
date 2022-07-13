@@ -474,7 +474,8 @@ KCDev.Mirrors = {};
 
         // Setup default values for these parameters
         parameters.zValue = (parameters.zValue === undefined) ? -1 : parameters.zValue;
-        parameters.maxWallDistance = (parameters.maxWallDistance === undefined) ? 20 : parameters.maxWallDistance;
+        parameters.maxWallDistance = parameters.maxWallDistance || parameters.maxWallDistance;
+        parameters.wallReflectType = parameters.wallReflectType || 'perspective';
 
         $.wallRegions = new Set(parameters.wallRegions);
         $.noReflectRegions = new Set(parameters.noReflectRegions);
@@ -667,7 +668,7 @@ KCDev.Mirrors = {};
          * @param {string} mode New wall reflection mode.
          */
         $.setWallReflectMode = function (mode = parameters.wallReflectType) {
-            if (parameters.wallReflectVar > 0) {
+            if (parameters.wallReflectVar) {
                 $gameVariables.setValue(parameters.wallReflectVar, mode);
             }
         };
@@ -677,7 +678,7 @@ KCDev.Mirrors = {};
          * @returns {number}
          */
         $.getWallReflectMode = function() {
-            if (parameters.wallReflectVar > 0) {
+            if (parameters.wallReflectVar) {
                 const val = $gameVariables.value(parameters.wallReflectVar);
                 if ($.wallModes[val]) {
                     return $.wallModes[val];
