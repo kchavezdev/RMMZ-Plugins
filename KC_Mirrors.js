@@ -53,7 +53,7 @@ SOFTWARE.
  * visible is placed on the closest tile with a wall reflection that is above
  * the character.
  * 
- * Also note that most parameters can have their values substituted with
+ * Also note that most arguments can have their values substituted with
  * variables by using \v[x] as an argument where x is a game variable ID.
  * 
  * -----------------------------Plugin Parameters-----------------------------
@@ -78,7 +78,33 @@ SOFTWARE.
  * Maximum Wall Distance:
  * This determines the maximum amount of tiles a character can be from a wall
  * before their reflection stops being drawn. This number also determines how
- * quickly a character shrinks as they move away from the wall.
+ * quickly a character shrinks as they move away from the wall if the wall
+ * reflections are in pseudo-perspective mode.
+ * 
+ * Wall Reflection Mode:
+ * This is the wall reflection mode that is used by default. Currently, there
+ * are two modes to choose from:
+ *   - Pseudo-perspective Mode:
+ *       This is the mode where wall reflections are made to appear as if the
+ *       characters are walking "into" the screen as the event or actor moves
+ *       further down from the mirror. This is achieved partly through making
+ *       the reflection sprite smaller as the character moves further down and
+ *       away from the mirror.
+ * 
+ *   - Event-like Mode:
+ *     In this mode, reflections appear more like an event would. So, there is
+ *     no sprite scaling as seen in pseudo-perspective mode. Instead, as the
+ *     character being reflected moves away from the mirror, their reflection
+ *     moves the same amount. So, if the character is 3 tiles south of the
+ *     base of the mirror, then their reflection is three tiles north of the
+ *     mirror's base.
+ * 
+ * Reflect Mode Variable:
+ * This allows the developer to bind the current reflection mode to a variable
+ * rather than use the same mode for the entire game. If there is an invalid
+ * reflection mode in this variable, the game falls back to the mode defined in
+ * the Wall Reflection Mode parameter. Setting this to 0 causes the defined
+ * Wall Reflection Mode to always be used.
  * 
  * ------------------------------Plugin Note Tags------------------------------
  * 
@@ -123,6 +149,10 @@ SOFTWARE.
  * Match Actor Reflection
  *   | Sets this actor's reflection graphic to their normal top view graphic.
  * 
+ * Set Wall Reflection Mode
+ *   | Sets the wall reflection mode by changing the wall reflection mode variable
+ *   | defined in the plugin parameters. Does nothing if that parameter is 0.
+ * 
  * Refresh Wall Reflections
  *   | Refreshes the wall reflection positions on the current map. Useful if
  *   | tiles on the current map have their regions updated.
@@ -141,7 +171,7 @@ SOFTWARE.
  *   | Same as Change Event Reflection command
  * 
  * resetEventReflectImage(event_id)
- *   | Same as Match Event Reflection
+ *   | Same as Match Event Reflection command
  * 
  * setActorReflect(actor_id, reflection_filename, reflection_index, floor_enabled, wall_enabled)
  *   | Same as Change Actor Reflection command
@@ -151,6 +181,9 @@ SOFTWARE.
  * 
  * refreshReflectWallCache()
  *   | Same as Refresh Wall Reflections command
+ * 
+ * setWallReflectMode(mode)
+ *   | Same as Set Wall Reflection Mode command
  * 
  * @param regionsParent
  * @text Regions
@@ -198,9 +231,27 @@ SOFTWARE.
  * @param maxWallDistance
  * @parent advancedOptsParent
  * @text Maximum Wall Distance
- * @desc Determines how far up the plugin checks for wall reflection. Also affects how quickly sprite shrinks in mirror.
+ * @desc Sets maximum distance for wall reflection to appear. Affects how quickly sprite shrinks in pseudo-perspective.
  * @type number
  * @default 20
+ * 
+ * @param wallReflectType
+ * @parent advancedOptsParent
+ * @text Wall Reflection Mode
+ * @desc Choose the type of wall reflection to use. This is also the fallback if the variable has an invalid value.
+ * @type select
+ * @option Pseudo-Perspective
+ * @value perspective
+ * @option Event-Like
+ * @value event
+ * @default perspective
+ * 
+ * @param wallReflectVar
+ * @parent wallReflectType
+ * @text Reflect Mode Variable
+ * @desc This variable is checked for a wall reflect type. Set to 0 to disable this.
+ * @type variable
+ * @default 0
  * 
  * @noteParam REFLECT_CHAR
  * @noteDir img/characters/
@@ -315,6 +366,19 @@ SOFTWARE.
  * @desc Specify the actor to change. 0 refers to the current party leader and negatives refer to followers in order.
  * @default 0
  * 
+ * @command setWallReflectMode
+ * @text Set Wall Reflection Mode
+ * @desc Sets the variable defined in the plugin params to a reflection mode.
+ * 
+ * @arg mode
+ * @text New Mode
+ * @type select
+ * @option Pseudo-Perspective
+ * @value perspective
+ * @option Event-Like
+ * @value event
+ * @default perspective
+ * 
  * @command refreshReflectMap
  * @text Refresh Wall Reflections
  * @desc Force refresh wall reflections on current map. Useful if region IDs of tiles are changed during gameplay.
@@ -348,8 +412,8 @@ var KCDev = KCDev || {};
 
 /**
  * @typedef {object} KCMirrors Represents this plugin's objects and functions
- * @property {Set<number>} WALL_REGIONS Tiles with this region ID will have reflections appear.
- * @property {Set<number>} NO_REFLECT_REGIONS If a character stands on a tile with this region ID, all reflections are disabled for said character
+ * @property {Set<number>} wallRegions Tiles with this region ID will have reflections appear.
+ * @property {Set<number>} noReflectRegions If a character stands on a tile with this region ID, all reflections are disabled for said character
  * @property {(eventId: number, reflectChar: string, reflectIndex: number, enableFloor: boolean, enableWall: boolean) => void} setEventReflect Set reflection properties of an event on the map.
  * @property {(eventId: number) => void} resetEventReflectImage Removes the custom reflection of an event.
  * @property {(actorId: number, reflectChar: string, reflectIndex: number, enableFloor: boolean, enableWall: boolean) => void} setActorReflect Set reflection properties of an actor.
@@ -364,6 +428,11 @@ var KCDev = KCDev || {};
  * @property {number} currMapId Keep track of the current map ID to avoid building the wall cache more than once
  * @property {Map<number, number[]>} reflectWallPositions Maps x coordinates to array of the y coordinates of wall regions
  * @property {() => void} refreshReflectWallCache Updates the cached wall reflection positions for current map.
+ * @property {(mode: string) => void} setWallReflectMode Updates the wall reflection mode variable.
+ * @property {() => string} getWallReflectMode Gets current wall reflection mode
+ * @property {object} wallModes Currently implemented wall reflection modes.
+ * @property {number} wallModes.perspective
+ * @property {number} wallModes.event
  */
 
 KCDev.Mirrors = {};
@@ -389,6 +458,8 @@ KCDev.Mirrors = {};
          * @property {object} eventDefault
          * @property {boolean} eventDefault.reflectFloor
          * @property {boolean} eventDefault.reflectWall
+         * @property {string} wallReflectType
+         * @property {number} wallReflectVar
          */
 
         /**
@@ -405,8 +476,12 @@ KCDev.Mirrors = {};
         parameters.zValue = (parameters.zValue === undefined) ? -1 : parameters.zValue;
         parameters.maxWallDistance = (parameters.maxWallDistance === undefined) ? 20 : parameters.maxWallDistance;
 
-        $.WALL_REGIONS = new Set(parameters.wallRegions);
-        $.NO_REFLECT_REGIONS = new Set(parameters.noReflectRegions);
+        $.wallRegions = new Set(parameters.wallRegions);
+        $.noReflectRegions = new Set(parameters.noReflectRegions);
+        $.wallModes = {
+            perspective: 1,
+            event: 2
+        };
 
         ////////////////////////////////////////////////////////////////////////////////////////////////////////////////
         // START CUSTOM CLASS DEFINITIONS                                                                             //
@@ -588,6 +663,30 @@ KCDev.Mirrors = {};
         };
 
         /**
+         * Sets the wall reflection variable type to a new value.
+         * @param {string} mode New wall reflection mode.
+         */
+        $.setWallReflectMode = function (mode = parameters.wallReflectType) {
+            if (parameters.wallReflectVar > 0) {
+                $gameVariables.setValue(parameters.wallReflectVar, mode);
+            }
+        };
+
+        /**
+         * Get current wall reflection mode
+         * @returns {number}
+         */
+        $.getWallReflectMode = function() {
+            if (parameters.wallReflectVar > 0) {
+                const val = $gameVariables.value(parameters.wallReflectVar);
+                if ($.wallModes[val]) {
+                    return $.wallModes[val];
+                }
+            }
+            return $.wallModes[parameters.wallReflectType];
+        };
+
+        /**
          * Returns a list of arguments to set the target's reflection properties and substitutes values that are
          * unchanged for the current values.
          * @param {Game_Character} char Character that is being updated
@@ -629,6 +728,10 @@ KCDev.Mirrors = {};
 
         PluginManagerEx.registerCommand(script, 'refreshReflectMap', function (args) {
             $.refreshReflectWallCache();
+        });
+
+        PluginManagerEx.registerCommand(script, 'setWallReflectMode', function (args) {
+            $.setWallReflectMode(args.mode);
         });
 
         ////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -991,7 +1094,7 @@ KCDev.Mirrors = {};
          */
         Sprite_Character.prototype.updateReflectFloor = function () {
             const r = this._reflectionFloor;
-            r.visible = r.visible = !$.NO_REFLECT_REGIONS.has($gameMap.regionId(this._character.x, this._character.y)) && this._character.reflectFloor();
+            r.visible = r.visible = !$.noReflectRegions.has($gameMap.regionId(this._character.x, this._character.y)) && this._character.reflectFloor();
 
             if (r.visible) {
                 this.updateReflectCommon(r);
@@ -999,14 +1102,7 @@ KCDev.Mirrors = {};
                 r.scale.x = this.scale.x;
                 r.scale.y = this.scale.y * -1;
                 r.y += getJumpOffset(this._character);
-                if (this.isTile() && this._characterName === r._characterName) {
-                    r._tileId = this._tileId;
-                    r.bitmap = this.bitmap;
-                    r.updateTileFrame();
-                }
-                else {
-                    setReflectFrame(r);
-                };
+                handleReflectFrame.call(this, r);
             }
         };
 
@@ -1031,7 +1127,7 @@ KCDev.Mirrors = {};
                 for (let j = $gameMap.height() - 1; j >= 0; j--) {
                     const regionId = $gameMap.regionId(i, j);
 
-                    if ($.WALL_REGIONS.has(regionId)) {
+                    if ($.wallRegions.has(regionId)) {
                         let yArr = regionMap.get(i);
 
                         if (!yArr) {
@@ -1083,7 +1179,7 @@ KCDev.Mirrors = {};
             const charX = this._character.x;
             const charY = this._character.y;
 
-            r.visible = !$.NO_REFLECT_REGIONS.has($gameMap.regionId(charX, charY)) && char.reflectWall() && !this.isTile();
+            r.visible = !$.noReflectRegions.has($gameMap.regionId(charX, charY)) && char.reflectWall();
 
             if (r.visible) {
                 this.updateReflectCommon(r);
@@ -1091,29 +1187,36 @@ KCDev.Mirrors = {};
                 r.visible = (wallY >= 0);
                 if (r.visible) {
 
+                    const isPerspectiveMode = $.getWallReflectMode() === $.wallModes.perspective;
+
                     const distToWall = char._realY - wallY;
 
                     const tileH = $gameMap.tileHeight();
 
-                    r.y = this.y - tileH * distToWall - distToWall;
-
-                    // fix wall mirrors near the top of a vertically looping map
-                    if (r.y < 0) {
-                        r.y += $gameMap.height() * tileH;
+                    if (isPerspectiveMode) {
+                        r.y = this.y - tileH * distToWall - distToWall;
+    
+                        let scale = 1 - (distToWall - 1) / parameters.maxWallDistance;
+                        if (scale > 1) {
+                            scale = 1;
+                        }
+                        else if (scale < 0) {
+                            scale = 0;
+                        }
+    
+                        r.scale.x = this.scale.x * -1 * scale;
+                        r.scale.y = this.scale.y * scale;
+                        r.y -= getJumpOffset(char) * scale * 0.1;
                     }
-
-                    let scale = 1 - (distToWall - 1) / parameters.maxWallDistance;
-                    if (scale > 1) {
-                        scale = 1;
+                    else {
+                        r.y = this.y - tileH * distToWall * 2 + tileH;
+    
+                        r.scale.x = this.scale.x * -1;
+                        r.scale.y = this.scale.y;
+                        r.y -= char.jumpHeight();
                     }
-                    else if (scale < 0) {
-                        scale = 0;
-                    }
-
-                    r.scale.x = this.scale.x * -1 * scale;
-                    r.scale.y = this.scale.y * scale;
-                    r.y -= getJumpOffset(this._character) * scale * 0.1;
-                    setReflectFrame(r);
+                    handleReflectFrame.call(this, r);
+                    
                 }
             }
         };
@@ -1147,6 +1250,22 @@ KCDev.Mirrors = {};
             }
             return changed;
         };
+
+        /**
+         * Handles drawing either a tile or a character
+         * @param {Sprite_Reflect} r Reflection sprite to be modified
+         */
+        function handleReflectFrame(r) {
+            if (this.isTile() && this._characterName === r._characterName) {
+                r._tileId = this._tileId;
+                r.bitmap = this.bitmap;
+                r.scale.x = Math.abs(r.scale.x);
+                r.updateTileFrame();
+            }
+            else {
+                setReflectFrame(r);
+            }
+        }
 
         /**
          * Switches to the appropriate frame for the reflection sprite
