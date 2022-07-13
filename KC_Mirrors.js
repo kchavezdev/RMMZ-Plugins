@@ -179,11 +179,11 @@ SOFTWARE.
  * resetActorReflectImage(actor_id)
  *   | Same as Match Actor Reflection command
  * 
- * refreshReflectWallCache()
- *   | Same as Refresh Wall Reflections command
- * 
  * setWallReflectMode(mode)
  *   | Same as Set Wall Reflection Mode command
+ * 
+ * refreshReflectWallCache()
+ *   | Same as Refresh Wall Reflections command
  * 
  * @param regionsParent
  * @text Regions
