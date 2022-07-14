@@ -31,7 +31,7 @@ SOFTWARE.
  * @base PluginCommonBase
  * @orderafter PluginCommonBase
  *
- * @plugindesc [v1.1.1]Add reflections to events and actors.
+ * @plugindesc [v1.1.2]Add reflections to events and actors.
  *
  * @help 
  * This is a plugin that allows the developer to add reflections to actors and 
@@ -291,6 +291,7 @@ SOFTWARE.
  * @option Disable
  * @value false
  * @option Unchanged
+ * @value unchanged
  * @default unchanged
  * 
  * @arg reflectWall
@@ -301,6 +302,7 @@ SOFTWARE.
  * @option Disable
  * @value false
  * @option Unchanged
+ * @value unchanged
  * @default unchanged
  * 
  * @command resetEventReflect
