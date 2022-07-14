@@ -31,7 +31,7 @@ SOFTWARE.
  * @base PluginCommonBase
  * @orderafter PluginCommonBase
  *
- * @plugindesc [v1.1]Add reflections to events and actors.
+ * @plugindesc [v1.1.1]Add reflections to events and actors.
  *
  * @help 
  * This is a plugin that allows the developer to add reflections to actors and 
@@ -590,9 +590,11 @@ KCDev.Mirrors = {};
          */
         $.setEventReflect = function (eventId, reflectChar, reflectIndex, enableFloor, enableWall) {
             const event = $gameMap.event(eventId === 0 ? this.eventId() : eventId);
-            event.setReflectImage(reflectChar, reflectIndex);
-            event.reflectFloorToggle(enableFloor);
-            event.reflectWallToggle(enableWall);
+            if (event) {
+                event.setReflectImage(reflectChar, reflectIndex);
+                event.reflectFloorToggle(enableFloor);
+                event.reflectWallToggle(enableWall);
+            }
         };
 
         /**
@@ -601,8 +603,7 @@ KCDev.Mirrors = {};
          */
         $.resetEventReflectImage = function (eventId) {
             const event = $gameMap.event(eventId === 0 ? this.eventId() : eventId);
-            
-            event.setReflectImage();
+            event?.setReflectImage();
         };
 
         /**
@@ -622,7 +623,7 @@ KCDev.Mirrors = {};
                 else {
                     const followers = $gamePlayer.followers();
                     const follower = followers.follower(Math.abs(actorId) - 1);
-                    if (follower) {
+                    if (follower?.actor()) {
                         return follower.actor().actorId();
                     }
                     else {
@@ -645,9 +646,11 @@ KCDev.Mirrors = {};
             const realId = getRealActorId(actorId);
             if (realId < 0) return;
             const actor = $gameActors.actor(realId);
-            actor.setReflectImage(reflectChar, reflectIndex)
-            actor.reflectFloorToggle(enableFloor);
-            actor.reflectWallToggle(enableWall);
+            if (actor) {
+                actor.setReflectImage(reflectChar, reflectIndex)
+                actor.reflectFloorToggle(enableFloor);
+                actor.reflectWallToggle(enableWall);
+            }
         };
 
         /**
@@ -659,8 +662,7 @@ KCDev.Mirrors = {};
             const realId = getRealActorId(actorId);
             if (realId < 0) return;
             const actor = $gameActors.actor(realId);
-            actor._reflectName = '';
-            actor._reflectIndex = -1;
+            actor?.setReflectImage();
         };
 
         /**
@@ -677,7 +679,7 @@ KCDev.Mirrors = {};
          * Get current wall reflection mode
          * @returns {number}
          */
-        $.getWallReflectMode = function() {
+        $.getWallReflectMode = function () {
             if (parameters.wallReflectVar) {
                 const val = $gameVariables.value(parameters.wallReflectVar);
                 if ($.wallModes[val]) {
@@ -700,6 +702,16 @@ KCDev.Mirrors = {};
          * @returns {Array<any>}
          */
         function convertChangeReflectArgs(char, args) {
+
+            if (!char) { // create a fake character with the desired functions if no character is passed in
+                char = {
+                    reflectName() { return '' },
+                    reflectIndex() { return -1 },
+                    reflectFloor() { return false; },
+                    reflectWall() { return false; }
+                }
+            }
+
             const id = args.id;
             const character = args.character === '' ? char.reflectName() : args.character;
             const index = args.index === '' ? char.reflectIndex() : args.index;
@@ -1196,7 +1208,7 @@ KCDev.Mirrors = {};
 
                     if (isPerspectiveMode) {
                         r.y = this.y - tileH * distToWall - distToWall;
-    
+
                         let scale = 1 - (distToWall - 1) / parameters.maxWallDistance;
                         if (scale > 1) {
                             scale = 1;
@@ -1204,20 +1216,20 @@ KCDev.Mirrors = {};
                         else if (scale < 0) {
                             scale = 0;
                         }
-    
+
                         r.scale.x = this.scale.x * -1 * scale;
                         r.scale.y = this.scale.y * scale;
                         r.y -= getJumpOffset(char) * scale * 0.1;
                     }
                     else {
                         r.y = this.y - tileH * distToWall * 2 + tileH;
-    
+
                         r.scale.x = this.scale.x * -1;
                         r.scale.y = this.scale.y;
                         r.y -= char.jumpHeight();
                     }
                     handleReflectFrame.call(this, r);
-                    
+
                 }
             }
         };
