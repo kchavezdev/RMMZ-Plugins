@@ -31,7 +31,7 @@ SOFTWARE.
  * @base PluginCommonBase
  * @orderafter PluginCommonBase
  *
- * @plugindesc [v1.1.2]Add reflections to events and actors.
+ * @plugindesc [v1.1.3]Add reflections to events and actors.
  *
  * @help 
  * This is a plugin that allows the developer to add reflections to actors and 
@@ -1271,7 +1271,7 @@ KCDev.Mirrors = {};
          * @param {Sprite_Reflect} r Reflection sprite to be modified
          */
         function handleReflectFrame(r) {
-            if (this.isTile() && this._characterName === r._characterName) {
+            if (this._tileId > 0 && this._characterName === r._characterName) {
                 r._tileId = this._tileId;
                 r.bitmap = this.bitmap;
                 r.scale.x = Math.abs(r.scale.x);
