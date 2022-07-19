@@ -31,7 +31,7 @@ SOFTWARE.
  * @base PluginCommonBase
  * @orderafter PluginCommonBase
  *
- * @plugindesc [v1.1.3]Add reflections to events and actors.
+ * @plugindesc [v1.1.4]Add reflections to events and actors.
  *
  * @help 
  * This is a plugin that allows the developer to add reflections to actors and 
@@ -407,10 +407,8 @@ SOFTWARE.
  * @typedef {object} KCNamespace
  * @property {KCMirrors} Mirrors
  */
-/**
- * @type {KCNamespace}
- */
-var KCDev = KCDev || {};
+
+var /** @type {KCNamespace} */ KCDev = KCDev || {};
 
 /**
  * @typedef {object} KCMirrors Represents this plugin's objects and functions
@@ -464,10 +462,7 @@ KCDev.Mirrors = {};
          * @property {number} wallReflectVar
          */
 
-        /**
-         * @type {KCMirrorParams}
-         */
-        const parameters = PluginManagerEx.createParameter(script);
+        const /** @type {KCMirrorParams} */ parameters = PluginManagerEx.createParameter(script);
 
         // delete decoration parameters
         delete parameters['regionsParent'];
@@ -508,6 +503,7 @@ KCDev.Mirrors = {};
                 super(spriteArgs);
                 this.anchor.x = 0.5;
                 this.anchor.y = 1;
+                this.parentSprite = parentCharSprite;
                 this.z = 2 * parameters.zValue;
                 this._character = parentCharSprite._character;
             }
@@ -541,34 +537,20 @@ KCDev.Mirrors = {};
                     return Math.floor(index / 4) * 4;
                 }
             };
+
+            _refresh() {
+                super._refresh();
+                const pp = this.parentSprite.pivot;
+                this.pivot.set(pp.x, pp.y);
+            }
         };
 
         class Sprite_Reflect_Wall extends Sprite_Reflect {
 
             // draw graphic for opposite facing direction
-            characterPatternY = function () {
-                let dir = 0;
-                switch (this._character.direction()) {
-                    case 2:
-                        dir = 8;
-                        break;
-
-                    case 4:
-                        dir = 6;
-                        break;
-
-                    case 6:
-                        dir = 4;
-                        break;
-
-                    case 8:
-                        dir = 2;
-
-                    default:
-                        break;
-                }
-                return (dir - 2) / 2;
-            };
+            characterPatternY() {
+                return (this._character.reverseDir(this._character.direction()) - 2) / 2;
+            }
         };
 
         $.Sprite_Reflect = Sprite_Reflect;
@@ -1108,14 +1090,16 @@ KCDev.Mirrors = {};
          * Updates the floor sprite's reflection's position and visibility for this character sprite
          */
         Sprite_Character.prototype.updateReflectFloor = function () {
-            const r = this._reflectionFloor;
+            const /**@type {Sprite_Reflect} */ r = this._reflectionFloor;
             r.visible = r.visible = !$.noReflectRegions.has($gameMap.regionId(this._character.x, this._character.y)) && this._character.reflectFloor();
 
             if (r.visible) {
                 this.updateReflectCommon(r);
-                r.y = this.y;
-                r.scale.x = this.scale.x;
-                r.scale.y = this.scale.y * -1;
+                // need to add portion of tile height for compatibility with KC_MoveRouteTF
+                r.y = this.y + ((this.pivot.y) ? r.patternHeight() * this.scale.y : 0);
+                r.angle = -this.angle + 180;
+                r.scale.x = -this.scale.x;
+                r.scale.y = this.scale.y;
                 r.y += getJumpOffset(this._character);
                 handleReflectFrame.call(this, r);
             }
@@ -1133,10 +1117,7 @@ KCDev.Mirrors = {};
          * @returns {Map<number, number[]}
          */
         function buildCurrentMapCache() {
-            /**
-             * @type {Map<number, number[]}
-             */
-            const regionMap = new Map();
+            const /** @type {Map<number, number[]} */ regionMap = new Map();
 
             for (let i = $gameMap.width() - 1; i >= 0; i--) {
                 for (let j = $gameMap.height() - 1; j >= 0; j--) {
@@ -1219,9 +1200,10 @@ KCDev.Mirrors = {};
                             scale = 0;
                         }
 
-                        r.scale.x = this.scale.x * -1 * scale;
+                        r.scale.x = -this.scale.x * scale;
                         r.scale.y = this.scale.y * scale;
                         r.y -= getJumpOffset(char) * scale * 0.1;
+                        r.y -= r.pivot.y * (1 - scale);
                     }
                     else {
                         r.y = this.y - tileH * distToWall * 2 + tileH;
@@ -1245,6 +1227,7 @@ KCDev.Mirrors = {};
             r.x = this.x;
             r.scale.set(this.scale.x, this.scale.y);
             r.angle = this.angle;
+            r.pivot.y = this.pivot.y;
             r.setBlendColor(this.getBlendColor());
             r.setColorTone(this.getColorTone());
             r.blendMode = this.blendMode;
