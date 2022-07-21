@@ -25,7 +25,7 @@
 /*:
  * @author K. Chavez 
  * @url https://github.com/kchavezdev/RMMZ-Plugins
- * @target MZ
+ * @target MZ MV
  * @orderBefore KC_Mirrors
  *
  * @plugindesc [v1.0.1]Rotate, translate, and scale characters during move routes.
@@ -177,7 +177,7 @@ KCDev.MoveRouteTF = {};
             this.scale.set(char.scaleX(), char.scaleY());
         }
         if (p.enableRot) {
-            this.angle = char.rotation();
+            this.rotation = char.rotation() * Math.PI / 180;
             this.pivot.y = -this.patternHeight() / 2;
             this.y += this.pivot.y * this.scale.y;
         }
