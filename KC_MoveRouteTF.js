@@ -28,7 +28,7 @@
  * @target MZ
  * @orderBefore KC_Mirrors
  *
- * @plugindesc [v1.0]Rotate, translate, and scale characters during move routes.
+ * @plugindesc [v1.0.1]Rotate, translate, and scale characters during move routes.
  *
  * @help 
  * This is a plugin that adds some functions that can be called during move 
@@ -216,9 +216,9 @@ KCDev.MoveRouteTF = {};
         });
     }
 
-    $.Game_Character_update = Game_Character.prototype.update;
+    $.Game_CharacterBase_update = Game_CharacterBase.prototype.update;
     Game_CharacterBase.prototype.update = function () {
-        $.Game_Character_update.apply(this, arguments);
+        $.Game_CharacterBase_update.apply(this, arguments);
         const em = this._moveRouteTransforms;
         updateTransformEx(em.rotation, em.transX, em.transY, em.scaleX, em.scaleY);
     };
