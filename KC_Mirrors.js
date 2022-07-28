@@ -2,7 +2,7 @@
 
 MIT License
 
-Copyright (c) 2022 K. Chavez
+Copyright (c) 2022 K. Chavez <kchavez.dev@gmail.com>
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
@@ -999,7 +999,7 @@ KCDev.Mirrors = {};
          * @param {Game_Event | Game_Actor} reflectableObj Game object with reflection setting and getting methods
          * @param {rm.types.Actor | rm.types.Event} target Database information that will be used to find the note tags
          * @param {{reflectFloor: boolean, reflectWall: boolean}} defaults Default values for floor and wall reflections for the target object
-         * @param {boolean} isActor True if this 
+         * @param {boolean} isActor Actors and events use different reflection characters!
          */
         function parseMetaValues(reflectableObj, target, defaults, isActor = false) {
             const refChar = isActor ? 'Reflect_Actor' : 'Reflect_Char';
@@ -1091,7 +1091,7 @@ KCDev.Mirrors = {};
          */
         Sprite_Character.prototype.updateReflectFloor = function () {
             const /**@type {Sprite_Reflect} */ r = this._reflectionFloor;
-            r.visible = r.visible = !$.noReflectRegions.has($gameMap.regionId(this._character.x, this._character.y)) && this._character.reflectFloor();
+            r.visible = !$.noReflectRegions.has($gameMap.regionId(this._character.x, this._character.y)) && this._character.reflectFloor();
 
             if (r.visible) {
                 this.updateReflectCommon(r);
