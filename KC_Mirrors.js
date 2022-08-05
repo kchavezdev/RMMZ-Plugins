@@ -31,9 +31,11 @@ SOFTWARE.
  * @base PluginCommonBase
  * @orderafter PluginCommonBase
  *
- * @plugindesc [v1.1.4]Add reflections to events and actors.
+ * @plugindesc [v1.2]Add reflections to events and actors.
  *
- * @help 
+ * @help
+ * KC_Mirrors.js
+ * 
  * This is a plugin that allows the developer to add reflections to actors and 
  * events. This is done by drawing sprites below the map but above the parallax
  * layer. So, to get full usage out of this plugin, you must be using tilesets
@@ -108,19 +110,51 @@ SOFTWARE.
  * 
  * ------------------------------Plugin Note Tags------------------------------
  * 
+ * This plugin allows the author to control various aspects of it via note tags.
+ * All of these note tags are completely OPTIONAL. Default values will be used
+ * if they are not present.
+ * 
  * Shared Note Tags:
  * 
+ * - These note tags are shared by the map, actors, and events
+ * 
  *   | <REFLECT_TYPE:[ALL/FLOOR/WALL]>
- *     | Determines which reflections are enabled for this character.
+ *     | Determines which reflections are enabled for this.
  *     | This overrides the defaults in this plugin's parameters.
  *     | ALL enables both wall and floor reflections
  *     | FLOOR enables floor reflections and disables wall reflections
- *     | WALL enabled wall reflections and disables floor reflections
+ *     | WALL enables wall reflections and disables floor reflections
+ *     |
+ *     | For the map, enabling only enables reflections on characters with the
+ *     | appropriate settings, and "disable" removes reflections regardless of
+ *     | character setup. By default, maps allow reflections to appear.
+ * 
+ * Map Note Tags:
+ * 
+ *   | <REFLECT_MODE:[PERSPECTIVE/EVENT]>
+ *     | This overrides the perspective option in the plugin parameters for this
+ *     | map. This is reset upon leaving and re-entering the map.
+ * 
+ * Shared Character Note Tags:
+ * 
+ * - These note tags are shared by actors and events
  * 
  *   | <REFLECT_INDEX:[x]>
  *     | x is the index of this character's reflection on the character sheet.
  *     | This parameters has no effect if the character is using a big
  *     | character for their reflection sprite.
+ * 
+ *   | <REFLECT_FLOOR_OPACITY:[x]>
+ *     | x is a number between 0-255, inclusive. This is the "opacity" of the
+ *       floor reflection sprite of the character. In other words, this is how
+ *       transparent the reflection sprites appear for the character, where 0 is
+ *       totally transparent and 255 is fully opaque.
+ * 
+ *   | <REFLECT_WALL_OPACITY:[x]>
+ *     | x is a number between 0-255, inclusive. This is the "opacity" of the
+ *       wall reflection sprite of the character. In other words, this is how
+ *       transparent the reflection sprites appear for the character, where 0 is
+ *       totally transparent and 255 is fully opaque.
  * 
  * Event Note Tags:
  * 
@@ -157,6 +191,11 @@ SOFTWARE.
  *   | Refreshes the wall reflection positions on the current map. Useful if
  *   | tiles on the current map have their regions updated.
  * 
+ * Override Map Settings
+ *   | Overrides reflection settings for the current map. This can be used to
+ *   | quickly disable all reflections or change the perspective mode temporarily.
+ *   | All changes are lost upon leaving and re-entering the map.
+ * 
  * ---------------------------Plugin Script Calls---------------------------
  * 
  * The script calls for this plugin are as follows.
@@ -167,13 +206,13 @@ SOFTWARE.
  * 
  * The commands are as follows:
  * 
- * setEventReflect(event_id, reflection_filename, reflection_index, floor_enabled, wall_enabled)
+ * setEventReflect(event_id, reflection_filename, reflection_index, floor_enabled, wall_enabled, floor_opacity, wall_opacity)
  *   | Same as Change Event Reflection command
  * 
  * resetEventReflectImage(event_id)
  *   | Same as Match Event Reflection command
  * 
- * setActorReflect(actor_id, reflection_filename, reflection_index, floor_enabled, wall_enabled)
+ * setActorReflect(actor_id, reflection_filename, reflection_index, floor_enabled, wall_enabled, floor_opacity, wall_opacity)
  *   | Same as Change Actor Reflection command
  * 
  * resetActorReflectImage(actor_id)
@@ -184,6 +223,9 @@ SOFTWARE.
  * 
  * refreshReflectWallCache()
  *   | Same as Refresh Wall Reflections command
+ * 
+ * overrideMapSettings(floorEnabled, wallEnabled, mode)
+ *   | Same as Override Map Settings command
  * 
  * @param regionsParent
  * @text Regions
@@ -283,6 +325,22 @@ SOFTWARE.
  * @desc Index to use in the new graphic. Keep empty to leave this unchanged.
  * @type text
  * 
+ * @arg reflectFloorOpacity
+ * @text Floor Opacity
+ * @desc Set the floor reflection's opacity by entering a number 0-255. -1 sets reflection to follow parent character's opacity.
+ * @type combo
+ * @option unchanged
+ * @option -1
+ * @default unchanged
+ * 
+ * @arg reflectWallOpacity
+ * @text Wall Opacity
+ * @desc Set the wall reflection's opacity by entering a number 0-255. -1 sets reflection to follow parent character's opacity.
+ * @type combo
+ * @option unchanged
+ * @option -1
+ * @default unchanged
+ * 
  * @arg reflectFloor
  * @text Enable Floor Reflection
  * @type select
@@ -307,7 +365,7 @@ SOFTWARE.
  * 
  * @command resetEventReflect
  * @text Match Event Reflection
- * @desc Set the chosen event's graphic to its current top view character graphic. Changes are reset on map reload.
+ * @desc Set the chosen event's graphic to its current top view character graphic and opacity. Changes are reset on map reload.
  * 
  * @arg id
  * @text Event ID
@@ -358,9 +416,25 @@ SOFTWARE.
  * @value unchanged
  * @default unchanged
  * 
+ * @arg reflectFloorOpacity
+ * @text Floor Opacity
+ * @desc Set the floor reflection's opacity by entering a number 0-255. -1 sets reflection to follow parent character's opacity.
+ * @type combo
+ * @option unchanged
+ * @option -1
+ * @default unchanged
+ * 
+ * @arg reflectWallOpacity
+ * @text Wall Opacity
+ * @desc Set the wall reflection's opacity by entering a number 0-255. -1 sets reflection to follow parent character's opacity.
+ * @type combo
+ * @option unchanged
+ * @option -1
+ * @default unchanged
+ * 
  * @command resetActorReflect
  * @text Match Actor Reflection
- * @desc Set the actor's reflection to the same graphic as their top view character.
+ * @desc Set the actor's reflection to the same graphic and opacity as their top view character.
  * 
  * @arg id
  * @text Actor ID
@@ -384,6 +458,51 @@ SOFTWARE.
  * @command refreshReflectMap
  * @text Refresh Wall Reflections
  * @desc Force refresh wall reflections on current map. Useful if region IDs of tiles are changed during gameplay.
+ * 
+ * @command overrideMapSettings
+ * @text Override Map Settings
+ * @desc These overrides will stay in effect until the map is left and re-entered. These overrides take priority over the plugin parameters.
+ * 
+ * @arg reflectFloor
+ * @text Allow Floor Reflections
+ * @type select
+ * @option Allow
+ * @value allow
+ * @option Disallow
+ * @value disallow
+ * @option Reset to Map Notes
+ * @value map notes
+ * @option Unchanged
+ * @value unchanged
+ * @default unchanged
+ * 
+ * @arg reflectWall
+ * @text Allow Wall Reflections
+ * @type select
+ * @option Allow
+ * @value allow
+ * @option Disallow
+ * @value disallow
+ * @option Reset to Map Notes
+ * @value map notes
+ * @option Unchanged
+ * @value unchanged
+ * @default unchanged
+ * 
+ * @arg mode
+ * @text Reflection Mode
+ * @type select
+ * @option Pseudo-Perspective
+ * @value perspective
+ * @option Event-Like
+ * @value event
+ * @option Match Plugin Params
+ * @value plugin params
+ * @option Match Map Notes
+ * @value map notes
+ * @option Unchanged
+ * @value unchanged
+ * @default unchanged
  * 
  */
 
@@ -433,6 +552,9 @@ var /** @type {KCNamespace} */ KCDev = KCDev || {};
  * @property {object} wallModes Currently implemented wall reflection modes.
  * @property {number} wallModes.perspective
  * @property {number} wallModes.event
+ * @property {(mapId: number) => void} Game_Map_setup Alias for Game_Map.prototype.setup
+ * @property {() => void} Game_Map_refresh Alias for Game_Map.prototype.refresh
+ * @property {(floorEnabled: boolean, wallEnabled: boolean, mode: string) => void} overrideMapSettings Overrides reflection parameters on current map
  */
 
 KCDev.Mirrors = {};
@@ -571,13 +693,17 @@ KCDev.Mirrors = {};
          * @param {number} reflectIndex Index of the character in the file to use as a reflection.
          * @param {boolean} enableFloor If true, enable floor reflections for the target event.
          * @param {boolean} enableWall If true, enable wall reflections for the target event.
+         * @param {number | undefined} floorOpacity Opacity of the floor reflection
+         * @param {number | undefined} wallOpacity Opacity of the wall reflection
          */
-        $.setEventReflect = function (eventId, reflectChar, reflectIndex, enableFloor, enableWall) {
+        $.setEventReflect = function (eventId, reflectChar, reflectIndex, enableFloor, enableWall, floorOpacity, wallOpacity) {
             const event = $gameMap.event(eventId === 0 ? this.eventId() : eventId);
             if (event) {
                 event.setReflectImage(reflectChar, reflectIndex);
                 event.reflectFloorToggle(enableFloor);
                 event.reflectWallToggle(enableWall);
+                event.setReflectFloorOpacity(floorOpacity);
+                event.setReflectWallOpacity(wallOpacity);
             }
         };
 
@@ -587,7 +713,11 @@ KCDev.Mirrors = {};
          */
         $.resetEventReflectImage = function (eventId) {
             const event = $gameMap.event(eventId === 0 ? this.eventId() : eventId);
-            event?.setReflectImage();
+            if (event) {
+                event.setReflectImage();
+                event.setReflectFloorOpacity();
+                event.setReflectWallOpacity();
+            }
         };
 
         /**
@@ -625,8 +755,10 @@ KCDev.Mirrors = {};
          * @param {number} reflectIndex Index of the character in the file to use as a reflection.
          * @param {boolean} enableFloor If true, enable floor reflections for the target actor.
          * @param {boolean} enableWall If true, enable wall reflections for the target actor.
+         * @param {number|undefined} floorOpacity Set floor reflection opacity
+         * @param {number|undefined} wallOpacity Set wall reflection opacity
          */
-        $.setActorReflect = function (actorId, reflectChar, reflectIndex, enableFloor, enableWall) {
+        $.setActorReflect = function (actorId, reflectChar, reflectIndex, enableFloor, enableWall, floorOpacity, wallOpacity) {
             const realId = getRealActorId(actorId);
             if (realId < 0) return;
             const actor = $gameActors.actor(realId);
@@ -634,6 +766,8 @@ KCDev.Mirrors = {};
                 actor.setReflectImage(reflectChar, reflectIndex)
                 actor.reflectFloorToggle(enableFloor);
                 actor.reflectWallToggle(enableWall);
+                actor.setReflectFloorOpacity(floorOpacity);
+                actor.setReflectWallOpacity(wallOpacity);
             }
         };
 
@@ -646,7 +780,11 @@ KCDev.Mirrors = {};
             const realId = getRealActorId(actorId);
             if (realId < 0) return;
             const actor = $gameActors.actor(realId);
-            actor?.setReflectImage();
+            if (actor) {
+                actor.setReflectImage();
+                actor.setReflectFloorOpacity();
+                actor.setReflectWallOpacity();
+            }
         };
 
         /**
@@ -660,7 +798,8 @@ KCDev.Mirrors = {};
         };
 
         /**
-         * Get current wall reflection mode
+         * Get current wall reflection mode in the plugin config
+         * This can be overwritten by map settings
          * @returns {number}
          */
         $.getWallReflectMode = function () {
@@ -683,6 +822,8 @@ KCDev.Mirrors = {};
          * @param {number | string} args.index Index of the character to use as a reflection. Empty string means do not change.
          * @param {boolean | string} args.reflectFloor Enables or disables the floor reflections of the target.
          * @param {boolean | string} args.reflectWall Enables or disables the wall reflections of the target.
+         * @param {number | string} args.reflectFloorOpacity Floor opacity to use for the reflection
+         * @param {number | string} args.reflectWallOpacity Wall opacity to use for the reflection
          * @returns {Array<any>}
          */
         function convertChangeReflectArgs(char, args) {
@@ -692,7 +833,9 @@ KCDev.Mirrors = {};
                     reflectName() { return '' },
                     reflectIndex() { return -1 },
                     reflectFloor() { return false; },
-                    reflectWall() { return false; }
+                    reflectWall() { return false; },
+                    reflectFloorOpacity() { return undefined; },
+                    setReflectWallOpacity() { return undefined; }
                 }
             }
 
@@ -701,8 +844,43 @@ KCDev.Mirrors = {};
             const index = args.index === '' ? char.reflectIndex() : args.index;
             const reflectFloor = args.reflectFloor === 'unchanged' ? char.reflectFloor() : args.reflectFloor;
             const reflectWall = args.reflectWall === 'unchanged' ? char.reflectWall() : args.reflectWall;
-            return [id, character.trim(), index, reflectFloor, reflectWall]
+            const reflectFloorOpacity = typeof (args.reflectFloorOpacity) !== 'number' ? char.reflectFloorOpacity() : (args.reflectFloorOpacity === -1 ? undefined : args.reflectFloorOpacity);
+            const reflectWallOpacity = typeof (args.reflectWallOpacity) !== 'number' ? char.reflectWallOpacity() : (args.reflectWallOpacity === -1 ? undefined : args.reflectWallOpacity);
+            return [id, character.trim(), index, reflectFloor, reflectWall, reflectFloorOpacity, reflectWallOpacity]
         }
+
+        /**
+         * Overrides map settings. These params are usually controlled through note tags
+         * @param {boolean} floorEnabled If false globally disable floor reflections for current map
+         * @param {boolean} wallEnabled If false globally disable wall reflections for current map
+         * @param {string} mode Reflection mode
+         */
+        $.overrideMapSettings = function (floorEnabled = 'unchanged', wallEnabled = 'unchanged', mode = 'unchanged') {
+            const refType = 'Reflect_Type';
+            const reflect = PluginManagerEx.findMetaValue($dataMap, [refType, refType.toLowerCase(), refType.toUpperCase()])?.trim().toUpperCase();
+            if (floorEnabled !== 'unchanged') $gameMap.setReflectFloor(floorEnabled === 'map notes' ? reflect === 'FLOOR' || reflect === 'ALL' || reflect === undefined : floorEnabled === 'allow');
+            if (wallEnabled !== 'unchanged') $gameMap.setReflectWall(wallEnabled === 'map notes' ? reflect === 'WALL' || reflect === 'ALL' || reflect === undefined : wallEnabled === 'allow');
+
+            if (mode !== 'unchanged') {
+                if (mode === 'map notes') {
+                    const refMode = 'Reflect_Mode';
+                    mode = PluginManagerEx.findMetaValue($dataMap, [refMode, refMode.toLowerCase(), refMode.toUpperCase()])?.toLowerCase().trim();
+                }
+                switch (mode) {
+                    case 'perspective':
+                        $gameMap.setReflectMode($.wallModes.perspective)
+                        break;
+    
+                    case 'event':
+                        $gameMap.setReflectMode($.wallModes.event);
+                        break;
+
+                    default:
+                        $gameMap.setReflectMode($.getWallReflectMode());
+                        break;
+                }
+            }
+        };
 
         PluginManagerEx.registerCommand(script, 'changeEventReflect', function (args) {
             $.setEventReflect.apply(this, convertChangeReflectArgs($gameMap.event(this.eventId()), args));
@@ -729,6 +907,10 @@ KCDev.Mirrors = {};
 
         PluginManagerEx.registerCommand(script, 'setWallReflectMode', function (args) {
             $.setWallReflectMode(args.mode);
+        });
+
+        PluginManagerEx.registerCommand(script, 'overrideMapSettings', function (args) {
+            $.overrideMapSettings(args.reflectFloor, args.reflectWall, args.mode);
         });
 
         ////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -854,7 +1036,7 @@ KCDev.Mirrors = {};
          * @returns {boolean}
          */
         Game_CharacterBase.prototype.reflectRefreshRequested = function () {
-            return this._refreshRequested;
+            return this._reflectRefreshRequested;
         };
 
         /**
@@ -862,7 +1044,7 @@ KCDev.Mirrors = {};
          * Requests for the reflection graphic to be updated on the next update
          */
         Game_CharacterBase.prototype.requestReflectRefresh = function () {
-            this._refreshRequested = true;
+            this._reflectRefreshRequested = true;
         };
 
         /**
@@ -870,7 +1052,41 @@ KCDev.Mirrors = {};
          * Clears reflection graphic refresh requests.
          */
         Game_CharacterBase.prototype.clearReflectRefresh = function () {
-            this._refreshRequested = false;
+            this._reflectRefreshRequested = false;
+        };
+
+        /**
+         * New method: Game_CharacterBase.prototype.reflectOpacity
+         * Returns floor reflection opacity for this character
+         * @returns {number | undefined}
+         */
+        Game_CharacterBase.prototype.reflectFloorOpacity = function () {
+            return this._reflectFloorOpacity;
+        };
+
+        /**
+         * New method: Game_CharacterBase.prototype.reflectWallOpacity
+         * Returns wall reflection opacity for this character
+         * @returns {number | undefined}
+         */
+         Game_CharacterBase.prototype.reflectWallOpacity = function () {
+            return this._reflectWallOpacity;
+        };
+
+        /**
+         * New method: Game_CharacterBase.prototype.setReflectFloorOpacity
+         * @param {number | undefined} opacity New opacity
+         */
+        Game_CharacterBase.prototype.setReflectFloorOpacity = function (opacity) {
+            this._reflectFloorOpacity = opacity;
+        };
+
+        /**
+         * New method: Game_CharacterBase.prototype.setReflectWallOpacity
+         * @param {number | undefined} opacity New opacity
+         */
+         Game_CharacterBase.prototype.setReflectWallOpacity = function (opacity) {
+            this._reflectWallOpacity = opacity;
         };
 
         ////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -905,6 +1121,8 @@ KCDev.Mirrors = {};
             }
             character.reflectFloorToggle(actor.reflectFloor());
             character.reflectWallToggle(actor.reflectWall());
+            character.setReflectFloorOpacity(actor.reflectFloorOpacity());
+            character.setReflectWallOpacity(actor.reflectWallOpacity());
         }
 
         $.Game_Actor_setup = Game_Actor.prototype.setup;
@@ -928,6 +1146,10 @@ KCDev.Mirrors = {};
         Game_Actor.prototype.reflectWallToggle = Game_CharacterBase.prototype.reflectWallToggle;
         Game_Actor.prototype.reflectName = Game_CharacterBase.prototype.reflectName;
         Game_Actor.prototype.reflectIndex = Game_CharacterBase.prototype.reflectIndex;
+        Game_Actor.prototype.setReflectFloorOpacity = Game_CharacterBase.prototype.setReflectFloorOpacity;
+        Game_Actor.prototype.setReflectWallOpacity = Game_CharacterBase.prototype.setReflectWallOpacity;
+        Game_Actor.prototype.reflectFloorOpacity = Game_CharacterBase.prototype.reflectFloorOpacity;
+        Game_Actor.prototype.reflectWallOpacity = Game_CharacterBase.prototype.reflectWallOpacity;
         Game_Actor.prototype.setReflectImage = function (filename = '', index = -1) { // same as Game_CharacterBase but without sprite refresh request
             this._reflectName = filename.trim();
             this._reflectIndex = index;
@@ -1005,8 +1227,12 @@ KCDev.Mirrors = {};
             const refChar = isActor ? 'Reflect_Actor' : 'Reflect_Char';
             const refIdx = 'Reflect_Index';
             const refType = 'Reflect_Type';
+            const refFloorOpa = 'Reflect_Floor_Opacity';
+            const refWallOpa = 'Reflect_Wall_Opacity';
             const metaChar = PluginManagerEx.findMetaValue(target, [refChar, refChar.toLowerCase(), refChar.toUpperCase()]);
             const metaIdx = PluginManagerEx.findMetaValue(target, [refIdx, refIdx.toLowerCase(), refIdx.toUpperCase()]);
+            const metaFloorOpa = PluginManagerEx.findMetaValue(target, [refFloorOpa, refFloorOpa.toLowerCase(), refFloorOpa.toUpperCase()]);
+            const metaWallOpa = PluginManagerEx.findMetaValue(target, [refWallOpa, refWallOpa.toLowerCase(), refWallOpa.toUpperCase()]);
             const reflectType = PluginManagerEx.findMetaValue(target, [refType, refType.toLowerCase(), refType.toUpperCase()]);
             reflectableObj.reflectFloorToggle(defaults.reflectFloor);
             reflectableObj.reflectWallToggle(defaults.reflectWall);
@@ -1035,7 +1261,111 @@ KCDev.Mirrors = {};
                 }
             }
             reflectableObj.setReflectImage(metaChar ? metaChar.trim() : '', metaIdx);
+            reflectableObj.setReflectFloorOpacity(typeof (metaFloorOpa) === 'number' ? metaFloorOpa : undefined);
+            reflectableObj.setReflectWallOpacity(typeof (metaWallOpa) === 'number' ? metaWallOpa : undefined);
         }
+
+        ////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+        // START Game_Map edits                                                                                       //
+        ////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+        function setupMapReflectOptions() {
+            const refType = 'Reflect_Type';
+            const reflect = PluginManagerEx.findMetaValue($dataMap, [refType, refType.toLowerCase(), refType.toUpperCase()])?.trim().toUpperCase();
+            $gameMap.setReflectWall(reflect === 'WALL' || reflect === 'ALL' || reflect === undefined);
+            $gameMap.setReflectFloor(reflect === 'FLOOR' || reflect === 'ALL' || reflect === undefined);
+            const refMode = 'Reflect_Mode';
+            const reflectMode = PluginManagerEx.findMetaValue($dataMap, [refMode, refMode.toLowerCase(), refMode.toUpperCase()])?.toUpperCase().trim();
+            switch (reflectMode) {
+                case 'PERSPECTIVE':
+                    $gameMap.setReflectMode($.wallModes.perspective)
+                    break;
+
+                case 'EVENT':
+                    $gameMap.setReflectMode($.wallModes.event);
+                    break;
+
+                default:
+                    $gameMap.setReflectMode($.getWallReflectMode());
+                    break;
+            }
+        }
+
+        $.Game_Map_refresh = Game_Map.prototype.refresh;
+        /**
+         * Aliased method: Game_Map.prototype.refresh
+         * Adds a compatibility fix for save files created with old version of plugin
+         */
+        Game_Map.prototype.refresh = function () {
+            $.Game_Map_refresh.apply(this, arguments);
+            if (this._reflectFloor === undefined) {
+                setupMapReflectOptions();
+            }
+        };
+
+        $.Game_Map_setup = Game_Map.prototype.setup;
+        /**
+         * Aliased method: Game_Map.prototype.setup
+         * Parse map information from note tags
+         * @param {number} mapId 
+         */
+        Game_Map.prototype.setup = function (mapId) {
+            $.Game_Map_setup.apply(this, arguments);
+            setupMapReflectOptions();
+        };
+
+        /**
+         * New method: Game_Map.prototype.reflectWall
+         * Returns whether wall reflections are enabled for the current map
+         * We need to invert this to maintain backwards compatibility with
+         * older versions of the plugin
+         * @returns {boolean}
+         */
+        Game_Map.prototype.reflectWall = function () {
+            return this._reflectWall;
+        };
+
+        /**
+         * New method: Game_Map.prototype.reflectFloor
+         * Returns whether floor reflections are enabled for the current map
+         * We need to invert this to maintain backwards compatibility with
+         * older versions of the plugin
+         * @returns {boolean}
+         */
+        Game_Map.prototype.reflectFloor = function () {
+            return this._reflectFloor;
+        };
+
+        /**
+         * New method: Game_Map.prototype.setReflectWall
+         * Globally enable or disable wall reflections for the map
+         * @param {boolean} reflectWall 
+         */
+        Game_Map.prototype.setReflectWall = function (reflectWall = false) {
+            this._reflectWall = reflectWall;
+        };
+
+        /**
+         * New method: Game_Map.prototype.setReflectFloor
+         * Globally enable or disable floor reflections for the map
+         * @param {boolean} reflectFloor 
+         */
+        Game_Map.prototype.setReflectFloor = function (reflectFloor = false) {
+            this._reflectFloor = reflectFloor;
+        };
+
+
+        Game_Map.prototype.reflectMode = function () {
+            return this._reflectMode;
+        };
+
+        Game_Map.prototype.setReflectMode = function (mode) {
+            this._reflectMode = mode;
+        };
+
+        ////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+        // END Game_Map edits                                                                                         //
+        ////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
         ////////////////////////////////////////////////////////////////////////////////////////////////////////////////
         // START Sprite_Character edits                                                                               //
@@ -1077,30 +1407,24 @@ KCDev.Mirrors = {};
         };
 
         /**
-         * Returns a fraction of the jump height to update reflection sprites while a character jumps.
-         * @param {Game_Character} char Character that is jumping
-         * @returns {number}
-         */
-        function getJumpOffset(char) {
-            return (char.isJumping()) ? char.jumpHeight() * 1.25 : 0;
-        }
-
-        /**
          * New method: Sprite_Character.prototype.updateReflectFloor
          * Updates the floor sprite's reflection's position and visibility for this character sprite
          */
         Sprite_Character.prototype.updateReflectFloor = function () {
             const /**@type {Sprite_Reflect} */ r = this._reflectionFloor;
-            r.visible = !$.noReflectRegions.has($gameMap.regionId(this._character.x, this._character.y)) && this._character.reflectFloor();
+            const char = this._character;
+            const o = char.reflectFloorOpacity();
+            r.visible = $gameMap.reflectFloor() && char.reflectFloor() && !$.noReflectRegions.has($gameMap.regionId(char.x, char.y)) && ((o === undefined && !char.isTransparent()) || o);
 
             if (r.visible) {
+                r.opacity = o === undefined ? this.opacity : o;
                 this.updateReflectCommon(r);
                 // need to add portion of tile height for compatibility with KC_MoveRouteTF
                 r.y = this.y + ((this.pivot.y) ? r.patternHeight() * this.scale.y : 0);
                 r.angle = -this.angle + 180;
                 r.scale.x = -this.scale.x;
                 r.scale.y = this.scale.y;
-                r.y += getJumpOffset(this._character);
+                r.y += char.jumpHeight() * 1.25;
                 handleReflectFrame.call(this, r);
             }
         };
@@ -1114,6 +1438,7 @@ KCDev.Mirrors = {};
 
         /**
          * Returns the reflectable wall region map for the current game map
+         * For performance, we pre-compute the closest wall region for every tile on the map
          * @returns {Map<number, number[]}
          */
         function buildCurrentMapCache() {
@@ -1142,7 +1467,7 @@ KCDev.Mirrors = {};
 
         /**
          * Gets the y coordinate of the closest tile with a wall reflection region that is above point (x,y)
-         * Returns -1 if no region with a wall reflection ID in the same column as (x,y)
+         * Returns -1 if no valid wall region found
          * @param {number} x 
          * @param {number} y 
          */
@@ -1174,16 +1499,18 @@ KCDev.Mirrors = {};
             const char = this._character;
             const charX = this._character.x;
             const charY = this._character.y;
+            const o = char.reflectWallOpacity();
 
-            r.visible = !$.noReflectRegions.has($gameMap.regionId(charX, charY)) && char.reflectWall();
+            r.visible = $gameMap.reflectWall() && char.reflectWall() && !$.noReflectRegions.has($gameMap.regionId(charX, charY)) && ((o === undefined && !char.isTransparent()) || o);
 
             if (r.visible) {
                 this.updateReflectCommon(r);
                 const wallY = getWallY(charX, charY);
                 r.visible = (wallY >= 0);
                 if (r.visible) {
+                    r.opacity = o === undefined ? this.opacity : o;
 
-                    const isPerspectiveMode = $.getWallReflectMode() === $.wallModes.perspective;
+                    const isPerspectiveMode = $gameMap.reflectMode() === $.wallModes.perspective;
 
                     const distToWall = char._realY - wallY;
 
@@ -1202,7 +1529,7 @@ KCDev.Mirrors = {};
 
                         r.scale.x = -this.scale.x * scale;
                         r.scale.y = this.scale.y * scale;
-                        r.y -= getJumpOffset(char) * scale * 0.1;
+                        r.y -= char.jumpHeight() * scale * 0.1;
                         r.y -= r.pivot.y * (1 - scale);
                     }
                     else {
@@ -1232,7 +1559,6 @@ KCDev.Mirrors = {};
             r.setColorTone(this.getColorTone());
             r.blendMode = this.blendMode;
             r.filters = this.filters;
-            r.opacity = this.opacity;
         };
 
         $.Sprite_Character_isImageChanged = Sprite_Character.prototype.isImageChanged;
