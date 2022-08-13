@@ -39,7 +39,7 @@
  * @base PluginBaseFunction
  * @orderafter PluginBaseFunction
  *
- * @plugindesc [v1.0]Combine graphics to create layered bitmaps.
+ * @plugindesc [v1.1]Combine graphics to create layered bitmaps.
  *
  * @help
  * KC_CompositeBitmaps.js
@@ -75,6 +75,11 @@
  * indexes 1 and 2 and use the "Add Character Layers" for index 1 of that
  * image, then the character at index 1 will have their image replaced and the
  * character at index 2 will be unaffected until layers are put at that index.
+ * 
+ * This plugin also allows \v[x] where x is a variable ID in the plugin command
+ * arguments, and the plugin will use the value in the game variable with ID x
+ * as the argument. So, \v[1] will use the value stored in game variable 1 for
+ * example.
  * 
  * The plugin commands are as follows:
  *
@@ -157,6 +162,12 @@
  * @desc Specify the face file these new layers will draw from.
  * @default []
  * 
+ * @arg shouldClearLayers
+ * @text Clear Old Layers
+ * @type boolean
+ * @desc Remove previous layers before adding these new ones.
+ * @default false
+ * 
  * @command removeFaceLayers
  * @text Remove All Face Layers
  * @desc Remove every layer associated with this face and allow the face to be drawn normally.
@@ -179,16 +190,21 @@
  * 
  * @arg destinationIndex
  * @text Proxy Index
- * @type number
+ * @type text
  * @desc Specify index of the character sprites we will replace with layers. Ignored for big characters.
  * @default 0
- * @min -1
  * 
  * @arg layerInfos
  * @text Layer Images
  * @desc Combine these character graphics. First image is the top layer.
  * @type struct<CharLayerInfo>[]
  * @default []
+ * 
+ * @arg shouldClearLayers
+ * @text Clear Old Layers
+ * @type boolean
+ * @desc Remove previous layers before adding these new ones.
+ * @default false
  * 
  * @command removeTvLayers
  * @text Remove All TV Character Layers
@@ -202,9 +218,8 @@
  * 
  * @arg destinationIndex
  * @text Proxy Index
- * @type number
+ * @type text
  * @desc Specify the index of the character sprites we will clear layers from.
- * @min -1
  * @default 0
  * 
  * @command addSvLayers
@@ -223,6 +238,12 @@
  * @desc The SV actor images that will be combined. First element is the top layer.
  * @dir img/sv_actors/
  * @default []
+ * 
+ * @arg shouldClearLayers
+ * @text Clear Old Layers
+ * @type boolean
+ * @desc Remove previous layers before adding these new ones.
+ * @default false
  * 
  * @command removeSvLayers
  * @text Remove All SV Layers
@@ -250,6 +271,12 @@
  * @desc The pictures that will be combined. First element is the top layer.
  * @dir img/pictures/
  * @default []
+ * 
+ * @arg shouldClearLayers
+ * @text Clear Old Layers
+ * @type boolean
+ * @desc Remove previous layers before adding these new ones.
+ * @default false
  * 
  * @command removePictureLayers
  * @text Remove All Picture Layers
@@ -309,8 +336,7 @@
  * @text Index
  * @desc Choose which index will be used as the layer.
  * This parameter is ignored for big characters.
- * @type number
- * @min 0
+ * @type text
  * @default 0
  * 
  */
@@ -325,8 +351,7 @@
  * @param sourceIndex
  * @text Index
  * @desc If an index > -1 is specified, the face image at that index will be copied to every slot in the composite image.
- * @type number
- * @min -1
+ * @type text
  * @default -1
  */
 /*~struct~CompositeFaceStruct:
@@ -351,10 +376,9 @@
  * 
  * @param destinationIndex
  * @text Proxy Index
- * @type number
+ * @type text
  * @desc Specify index of the character sprites we will replace with layers. Ignored for big characters.
  * @default 0
- * @min -1
  * 
  * @param layerInfos
  * @text Layer Images
@@ -377,13 +401,13 @@
  * @default []
  */
 /*~struct~CompositePictureStruct:
- * @arg destination
+ * @param destination
  * @text Proxy File
  * @type file
  * @desc Specify the placeholder file name. Any time this picture is drawn, the layers will be drawn instead.
  * @dir img/pictures/
  * 
- * @arg layers
+ * @param layers
  * @text Layer Images
  * @type file[]
  * @desc The pictures that will be combined. First element is the top layer.
@@ -826,7 +850,11 @@ KCDev.CompositeBitmaps = {};
         }
     };
 
-    function addFaceLayers(args) {
+    $.addFaceLayers = function (args) {
+        if (args.shouldClearLayers) {
+            $.removeFaceLayers.apply(this, arguments);
+        }
+
         const layerInfos = args.layerInfos;
 
         if (Array.isArray(layerInfos)) {
@@ -835,6 +863,10 @@ KCDev.CompositeBitmaps = {};
                 $.addFaceLayer(info.source, args.destination, info.sourceIndex);
             }
         }
+    };
+
+    function addFaceLayers(args) {
+        $.addFaceLayers.apply(this, arguments);
     }
 
     PluginManagerEx.registerCommand(script, "addFaceLayers", addFaceLayers);
@@ -842,7 +874,8 @@ KCDev.CompositeBitmaps = {};
     /**
      * @param {string} faceName Face file name to be removed
      */
-    $.removeFaceLayers = function (faceName) {
+    $.removeFaceLayers = function (args) {
+        const faceName = args.destination;
         delete $.faceLayers[faceName];
         invalidateCachedComposites(faceName, $.FACE_PREFIX);
         if ($gameParty.inBattle()) {
@@ -850,8 +883,8 @@ KCDev.CompositeBitmaps = {};
         }
     }
 
-    function removeFaceLayers (args) {
-        $.removeFaceLayers(args.destination);
+    function removeFaceLayers(args) {
+        $.removeFaceLayers.apply(this, arguments);
     }
 
     PluginManagerEx.registerCommand(script, "removeFaceLayers", removeFaceLayers);
@@ -894,7 +927,10 @@ KCDev.CompositeBitmaps = {};
         }
     };
 
-    function addTvLayers(args) {
+    $.addTvLayers = function (args) {
+        if (args.shouldClearLayers) {
+            $.removeTvLayers.apply(this, arguments);
+        }
         const layerInfos = args.layerInfos;
         const dest = args.destination;
         const destination_index = (ImageManager.isBigCharacter(dest)) ? 0 : args.destinationIndex;
@@ -909,9 +945,13 @@ KCDev.CompositeBitmaps = {};
         }
     }
 
+    function addTvLayers(args) {
+        $.addTvLayers.apply(this, arguments);
+    }
+
     PluginManagerEx.registerCommand(script, "addTvLayers", addTvLayers);
 
-    function removeTvLayers(args) {
+    $.removeTvLayers = function (args) {
         const key = args.destination;
 
         const chArr = $.tvCharLayers[key];
@@ -933,6 +973,10 @@ KCDev.CompositeBitmaps = {};
             invalidateCachedComposites(key, $.TOP_VIEW_PREFIX);
             $.refreshMapCompositeChars();
         }
+    }
+
+    function removeTvLayers(args) {
+        $.removeTvLayers.apply(this, arguments);
     }
 
     PluginManagerEx.registerCommand(script, "removeTvLayers", removeTvLayers);
@@ -972,23 +1016,34 @@ KCDev.CompositeBitmaps = {};
         }
     };
 
-    function addSvLayers(args) {
+    $.addSvLayers = function (args) {
+        if (args.shouldClearLayers) {
+            $.removeSvLayers.apply(this, arguments);
+        }
         const layers = args.layers;
         if (Array.isArray(layers)) {
             while (layers.length > 0) {
                 $.addSvLayer(layers.pop(), args.destination)
             }
         }
+    };
+
+    function addSvLayers(args) {
+        $.addSvLayers.apply(this, arguments);
     }
 
     PluginManagerEx.registerCommand(script, "addSvLayers", addSvLayers);
 
-    function removeSvLayers(args) {
+    $.removeSvLayers = function (args) {
         delete $.svCharLayers[args.destination];
 
         invalidateCachedComposites(args.destination, $.SIDE_VIEW_PREFIX);
 
         $.refreshSVBattlers();
+    };
+
+    function removeSvLayers(args) {
+        $.removeSvLayers.apply(this, arguments);
     }
 
     PluginManagerEx.registerCommand(script, "removeSvLayers", removeSvLayers);
@@ -1007,21 +1062,32 @@ KCDev.CompositeBitmaps = {};
         }
     };
 
-    function addPictureLayers(args) {
+    $.addPictureLayers = function (args) {
+        if (args.shouldClearLayers) {
+            $.removePictureLayers.apply(this, arguments);
+        }
         const layers = args.layers;
         if (Array.isArray(layers)) {
             while (layers.length > 0) {
                 $.addPictureLayer(layers.pop(), args.destination)
             }
         }
+    };
+
+    function addPictureLayers(args) {
+        $.addPictureLayers.apply(this, arguments);
     }
 
     PluginManagerEx.registerCommand(script, "addPictureLayers", addPictureLayers);
 
-    function removePictureLayers(args) {
+    $.removePictureLayers = function (args) {
         delete $.picLayers[args.destination];
 
         invalidateCachedComposites(args.destination, $.PICTURE_PREFIX);
+    };
+
+    function removePictureLayers(args) {
+        $.removePictureLayers.apply(this, arguments);
     }
 
     PluginManagerEx.registerCommand(script, "removePictureLayers", removePictureLayers);
@@ -1278,11 +1344,11 @@ KCDev.CompositeBitmaps = {};
                 super(layerInfos, $.ImageManager_loadCharacter);
 
                 this._orig = origName;
-    
+
                 this._isBig = ImageManager.isBigCharacter(origName);
-    
+
                 this._layerInfos = layerInfos;
-    
+
                 this._startLoading();
             }
 
@@ -1316,9 +1382,9 @@ KCDev.CompositeBitmaps = {};
             constructor(layerInfos) {
 
                 super(layerInfos, $.ImageManager_loadFace);
-    
+
                 this._layerInfos = layerInfos;
-    
+
                 this._startLoading();
             }
 
