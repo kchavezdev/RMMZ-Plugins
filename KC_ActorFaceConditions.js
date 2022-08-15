@@ -29,7 +29,7 @@ SOFTWARE.
  * @url https://github.com/kchavezdev/RMMZ-Plugins
  * @target MZ
  *
- * @plugindesc [v1.0]Display Actor Face based on conditions.
+ * @plugindesc [v1.0.1]Display Actor Face based on conditions.
  *
  * @help
  * This plugin switches which actor face is displayed in menus based on
@@ -642,9 +642,9 @@ KCDev.ActorFaceConditions = {};
      * @param {string} tag The value of the FACE_CONDITIONS note tag
      */
     function parseNoteTag(actorId, tag) {
-        console.log(tag);
+        // console.log(tag);
         const extract = extractWrappers(tag, '{', '}', 'code', '', '\n');
-        console.log(extract);
+        // console.log(extract);
         const lines = extract.newStr.split('\n');
         const /**@type {Face_Condition_List[]} */ finalList = [];
         let /**@type {Face_Condition_List} */ currList;
@@ -652,7 +652,7 @@ KCDev.ActorFaceConditions = {};
             const /**@type {string}*/ formattedLine = line.replaceAll(/\s+/g, ' ').trim();
             if (formattedLine === '') return;
             const firstSpaceIdx = formattedLine.indexOf(' ');
-            console.log(formattedLine);
+            // console.log(formattedLine);
             if (firstSpaceIdx > 0) {
                 const noteKeyword = formattedLine.slice(0, firstSpaceIdx).toLowerCase();
                 const noteArgs = formattedLine.slice(firstSpaceIdx + 1, line.length);
@@ -679,7 +679,7 @@ KCDev.ActorFaceConditions = {};
                     const /**@type {string[]} */ blockComponents = formattedLine.split('||');
                     blockComponents.forEach(command => {
                         const trimmed = command.trim();
-                        //console.log(trimmed);
+                        // console.log(trimmed);
                         const commandFirstSpace = trimmed.indexOf(' ');
 
                         if (commandFirstSpace > 0) {
@@ -814,7 +814,7 @@ KCDev.ActorFaceConditions = {};
                 parseNoteTag(actor.id, cond.slice(endTag.length, cond.length - endTag.length));
             }
         }
-        console.log($.actorToCondList);
+        // console.log($.actorToCondList);
     };
 
     $.Window_StatusBase_drawActorFace = Window_StatusBase.prototype.drawActorFace;
