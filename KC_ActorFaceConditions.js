@@ -28,8 +28,11 @@ SOFTWARE.
  * @author K. Chavez
  * @url https://github.com/kchavezdev/RMMZ-Plugins
  * @target MZ
+ * @orderAfter animatedSVEnemies
+ * @orderAfter VisuMZ_1_BattleCore
+ * @orderAfter SoR_EnemySVSprite_MZ
  *
- * @plugindesc [v1.0.1]Display Actor Face based on conditions.
+ * @plugindesc [v1.1]Display Actor Face based on conditions.
  *
  * @help
  * This plugin switches which actor face is displayed in menus based on
@@ -45,6 +48,8 @@ SOFTWARE.
  * Arguments will be denoted as <argument_name>. If an argument is invertible
  * (i.e. you want the condition to be met when it is false), it can be prefixed
  * by '!'.
+ * 
+ * Also, lines can be "commented out" by starting the line with '//'.
  * 
  * > addface <face_index> <face_name>
  * * NOT INVERTIBLE
@@ -121,7 +126,7 @@ SOFTWARE.
  *   This is one of the most verastile commands. The operation argument is
  *   the simplest and most self-explanatory. They are comparison operators,
  *   where = checks if parameter1 is equal to parameter 2, != checks if
- *   parameter 1 is NOT equal to parameter to, and so on.
+ *   parameter 1 is NOT equal to parameter 2, and so on.
  * 
  *   The parameters can take on many values. As mentioned, game switches and
  *   game variables can be accessed using the \v[x] and \s[x] special codes.
@@ -188,8 +193,6 @@ KCDev.ActorFaceConditions = {};
 
 (($) => {
     'use strict';
-    const pluginName = document.currentScript.src.split("/").pop().replace(/\.js$/, "");
-    const parameters = PluginManager.parameters(pluginName);
 
     $.comparisonFunctions = {
         '=': function (param1, param2) { return param1 === param2; },
@@ -200,6 +203,7 @@ KCDev.ActorFaceConditions = {};
         '>=': function (param1, param2) { return param1 >= param2; },
     };
     $.actorToCondList = new Map();
+    $.recentMotions = new Map();
 
     class Face_Condition_Block {
 
@@ -361,10 +365,9 @@ KCDev.ActorFaceConditions = {};
                 motion: motionName,
                 truthVal: !invert,
                 isTrue: function () {
-                    const a = $gameActors.actor(this.actorId);
-                    return (a.motionType() === motionName) === this.truthVal;
+                    return ($.recentMotions.get(this.actorId) === motionName) === this.truthVal;
                 }
-            })
+            });
         }
 
         /**
@@ -650,7 +653,7 @@ KCDev.ActorFaceConditions = {};
         let /**@type {Face_Condition_List} */ currList;
         lines.forEach(line => {
             const /**@type {string}*/ formattedLine = line.replaceAll(/\s+/g, ' ').trim();
-            if (formattedLine === '') return;
+            if (formattedLine === '' || formattedLine.startsWith('//')) return;
             const firstSpaceIdx = formattedLine.indexOf(' ');
             // console.log(formattedLine);
             if (firstSpaceIdx > 0) {
@@ -844,20 +847,20 @@ KCDev.ActorFaceConditions = {};
      */
     Game_Actor.prototype.isFaceConditionEnabled = function () {
         return this._faceConditionEnabled;
-    }
+    };
 
     /**
      * @param {boolean} enabled 
      */
     Game_Actor.prototype.setFaceConditionEnabled = function (enabled) {
         this._faceConditionEnabled = enabled;
-    }
+    };
 
     $.Game_Actor_setup = Game_Actor.prototype.setup;
     Game_Actor.prototype.setup = function () {
         $.Game_Actor_setup.apply(this, arguments);
         this._faceConditionEnabled = !!$.actorToCondList.get(this.actorId()) && !$dataActors[this.actorId()].note.match(/<face_conditions_disabled>/i);
-    }
+    };
 
     $.BattleManager_displayBattlerStatus = BattleManager.displayBattlerStatus;
     BattleManager.displayBattlerStatus = function (battler, current) {
@@ -865,12 +868,29 @@ KCDev.ActorFaceConditions = {};
         $.BattleManager_displayBattlerStatus.apply(this, arguments);
     };
 
-    $.Game_Actor_requestMotion = Game_Actor.prototype.requestMotion;
-    Game_Actor.prototype.requestMotion = function (motion) {
-        $.Game_Actor_requestMotion.apply(this, arguments);
-        if (this.isFaceConditionEnabled()) {
+    // Enemy side view actor sprite compatibility
+    if (Game_Enemy.prototype.requestMotion) {
+        Game_Enemy.prototype.isFaceConditionEnabled = function () { return false; };
+    }
+
+    $.Sprite_Actor_startMotion = Sprite_Actor.prototype.startMotion;
+    Sprite_Actor.prototype.startMotion = function (motionType) {
+        if (this._actor.isFaceConditionEnabled?.()) {
+            $.recentMotions.set(this._actor.actorId(), motionType);
             $gameTemp.requestBattleRefresh();
         }
-    }
+        $.Sprite_Actor_startMotion.apply(this, arguments);
+    };
+
+    $.BattleManager_startBattle = BattleManager.startBattle;
+    BattleManager.startBattle = function () {
+        $.BattleManager_startBattle.apply(this, arguments);
+    };
+
+    $.BattleManager_endBattle = BattleManager.endBattle;
+    BattleManager.endBattle = function (result) {
+        $.BattleManager_endBattle.apply(this, arguments);
+        $.recentMotions.clear();
+    };
 
 })(KCDev.ActorFaceConditions);
