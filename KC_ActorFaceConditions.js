@@ -28,15 +28,30 @@ SOFTWARE.
  * @author K. Chavez
  * @url https://github.com/kchavezdev/RMMZ-Plugins
  * @target MZ
- * @orderAfter animatedSVEnemies
- * @orderAfter VisuMZ_1_BattleCore
- * @orderAfter SoR_EnemySVSprite_MZ
  *
- * @plugindesc [v1.1]Display Actor Face based on conditions.
+ * @plugindesc [v1.1.1]Display Actor Face based on conditions.
  *
  * @help
  * This plugin switches which actor face is displayed in menus based on
  * conditions specified in the actor's notes.
+ * 
+ * For compatibility, place this plugin after animatedSVEnemies, 
+ * VisuMZ_1_BattleCore, or SoR_EnemySVSprite_MZ if you are using any of
+ * those plugins.
+ * 
+ * Changelog:
+ *   v1.0.0 - 2022/07/28
+ *     - Initial release
+ *   v1.0.1 - 2022/08/15
+ *     - Commented out some debug logging
+ *   v1.1.0 - 2022/08/29
+ *     - Fixed svmotion condition behavior by moving the check from Game_Actor
+ *       to Sprite_Actor and tracking the most recently started motion
+ *     - Added ability to comment out lines
+ *     - Fixed a few typos and style errors
+ *   v1.1.1 - 2022/10/05
+ *     - Fixed a bug that caused note tag parsing to fail if more than one
+ *       eval and/or function command was used on the actor
  * 
  * To begin a face condition list, start with the tag <face_conditions>, and to
  * end the list, use the tag </face_conditions>. This list will be processed
@@ -597,22 +612,18 @@ KCDev.ActorFaceConditions = {};
         let openIndex = -1;
         let pos = 0;
 
-        let done = false;
-
-        while (!done) {
+        while (pos < s.length) {
             if (openIndex < 0) {
                 openIndex = s.indexOf(openingChar, pos);
-
                 if (openIndex < 0) {
-                    done = true;
-                    continue;
+                    break; // no more opening characters so break
                 }
                 closeCounter = 0;
                 openCounter = 1;
                 pos = openIndex;
             }
 
-            while (closeCounter < openCounter) {
+            while (closeCounter < openCounter && pos < s.length) {
                 pos++;
                 if (s.charAt(pos) === openingChar) {
                     openCounter++;
@@ -623,7 +634,7 @@ KCDev.ActorFaceConditions = {};
             }
 
             const extractedText = s.substring(openIndex + 1, pos);
-            finalMap.set(placeholderBase + placeholderCounter, extractedText);
+            finalMap.set(placeholderBase + placeholderCounter++, extractedText);
 
             openIndex = -1;
         }
