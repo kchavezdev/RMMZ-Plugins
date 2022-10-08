@@ -44,7 +44,11 @@
  * Script Calls:
  * KCDev.FollowerTalk.recentActorId()
  * | Returns the result of the most recent check. Useful for script calls in
- *   cases where you do not want to use a Game Variable for this plugin.
+ *   cases where you do not want to use a Game Variable for this plugin
+ * | Is 0 if the the player pushed the follower talk button while not looking
+ *   at a follower
+ * | This is NOT updated if the player cannot talk to followers (e.g. the
+ *   disable switch is on or the player is in a cutscene)
  * 
  * @param commonId
  * @text Common Event ID
