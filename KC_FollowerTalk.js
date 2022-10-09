@@ -36,6 +36,9 @@
  *   v1.0.0 - 2022/10/08
  *     - Initial release
  * 
+ * Compatibility Notes:
+ *   | SAN_AnalogMove: Place KC_FollowerTalk BELOW SAN_AnalogMove
+ * 
  * This is a plugin that lets the player trigger a common event upon
  * interacting with their followers. The use that I developed this
  * plugin for in particular is to initiate "conversations" with the
