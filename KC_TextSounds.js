@@ -27,10 +27,17 @@
  * @url https://github.com/kchavezdev/RMMZ-Plugins
  * @target MZ MV
  *
- * @plugindesc [v1.0]Play text sound effects based on face graphic.
+ * @plugindesc [v1.0.1]Play text sound effects based on face graphic.
  *
  * @help
  * KC_TextSounds.js
+ * 
+ * Changelog:
+ *   v1.0.0 - 2022/22/08
+ *     - Initial release
+ * 
+ *   v1.0.1 - 2022/14/10
+ *     - Fixed frequency being off by 1.
  * 
  * This plugin plays SEs as text is displayed in message boxes.
  * 
@@ -465,6 +472,7 @@ KCDev.TextSounds = {};
     Window_Message.prototype.processCharacter = function (textState) {
         const c = textState.text[textState.index];
         if (c.charCodeAt(0) >= 0x20) {
+            $gameMessage.incrementTextSeCounter();
             if (c.match(/\S/g)) {
                 const /**@type {Text_Sound} */ se = $gameMessage.textSe();
                 if ($gameMessage.textSeCounter() >= se.frequency) {
@@ -472,7 +480,6 @@ KCDev.TextSounds = {};
                     $gameMessage.resetTextSeCounter();
                 }
             }
-            $gameMessage.incrementTextSeCounter();
         }
         $.Window_Message_processCharacter.apply(this, arguments);
     };
