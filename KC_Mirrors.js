@@ -541,6 +541,10 @@ KCDev.Mirrors.eventDefault.reflectWall = false;
 /** @type {Map<number,number[]>} */
 KCDev.Mirrors.reflectWallPositions = null;
 KCDev.Mirrors.currMapId = -1;
+/** @type {Set<number>} */
+KCDev.Mirrors.wallRegions = null;
+/** @type {Set<number>} */
+KCDev.Mirrors.noReflectRegions = null;
 
 (() => {
     const script = document.currentScript;
