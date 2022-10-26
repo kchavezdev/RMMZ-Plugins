@@ -1387,6 +1387,7 @@ Sprite_Character.prototype.updateReflectionSprite = function () {
 
     this.updateReflectFloor();
     this.updateReflectWall();
+    this.updateReflectFilters();
 };
 
 /**
@@ -1542,7 +1543,15 @@ Sprite_Character.prototype.updateReflectCommon = function (r) {
     r.setBlendColor(this.getBlendColor());
     r.setColorTone(this.getColorTone());
     r.blendMode = this.blendMode;
-    r.filters = this.filters;
+};
+
+/**
+ * New method: Sprite_Character.prototype.updateReflectFilter
+ * Matches the sprite's reflections to the filters.
+ */
+Sprite_Character.prototype.updateReflectFilters = function () {
+    this._reflectFloor.filters = this.filters;
+    this._reflectWall.filters = this.filters;
 };
 
 KCDev.Mirrors.Sprite_Character_isImageChanged = Sprite_Character.prototype.isImageChanged;
@@ -1591,3 +1600,42 @@ KCDev.Mirrors.setReflectFrame = function (r) {
 // END Sprite_Character edits                                                                                 //
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// START FilterControllerMZ Extension                                                                         //
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+if (window.Filter_Controller) {
+    const Type = Filter_Controller.targetType;
+    const targetGetter = Filter_Controller.targetGetter;
+
+    Type.CharReflectionsFloor = 'CharReflectionsFloor';
+    Type.CharReflectionsWall = 'CharReflectionsWall';
+    Type.CharReflections = 'CharReflections';
+
+    targetGetter[Type.CharReflectionsFloor] = function(targetIds) {
+        const targets = [];
+        if (this._spriteset && this._spriteset._characterSprites) {
+            this._spriteset._characterSprites.forEach(sprite => targets.push(sprite._reflectionFloor));
+        }
+        return targets;
+    };
+
+    targetGetter[Type.CharReflectionsWall] = function(targetIds) {
+        const targets = [];
+        if (this._spriteset && this._spriteset._characterSprites) {
+            this._spriteset._characterSprites.forEach(sprite => targets.push(sprite._reflectionWall));
+        }
+        return targets;
+    };
+
+    targetGetter[Type.CharReflections] = function(targetIds) {
+        return Filter_Controller.targetGetter[Filter_Controller.targetType['CharReflectionsFloor']]().concat(Filter_Controller.targetGetter[Filter_Controller.targetType['CharReflectionsWall']]());
+    };
+
+    // dummy out this function
+    Sprite_Character.prototype.updateReflectFilters = function () {}
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// END FilterControllerMZ Extension                                                                           //
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////
