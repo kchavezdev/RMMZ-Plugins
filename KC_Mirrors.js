@@ -527,17 +527,20 @@ var KCDev = KCDev || {};
 
 KCDev.Mirrors = {};
 
-KCDev.Mirrors.parameters = {}
-KCDev.Mirrors.parameters.zValue = -1,
-KCDev.Mirrors.parameters.wallReflectType = 'perspective';
-KCDev.Mirrors.parameters.wallReflectVar = 0;
-KCDev.Mirrors.parameters.maxWallDistance = 20;
-KCDev.Mirrors.parameters.actorDefault = {};
-KCDev.Mirrors.parameters.actorDefault.reflectFloor = true;
-KCDev.Mirrors.parameters.actorDefault.reflectWall = true;
-KCDev.Mirrors.parameters.eventDefault = {};
-KCDev.Mirrors.parameters.eventDefault.reflectFloor = false;
-KCDev.Mirrors.parameters.eventDefault.reflectWall = false;
+KCDev.Mirrors = {};
+KCDev.Mirrors.zValue = -1;
+KCDev.Mirrors.wallReflectType = 'perspective';
+KCDev.Mirrors.wallReflectVar = 0;
+KCDev.Mirrors.maxWallDistance = 20;
+KCDev.Mirrors.actorDefault = {};
+KCDev.Mirrors.actorDefault.reflectFloor = true;
+KCDev.Mirrors.actorDefault.reflectWall = true;
+KCDev.Mirrors.eventDefault = {};
+KCDev.Mirrors.eventDefault.reflectFloor = false;
+KCDev.Mirrors.eventDefault.reflectWall = false;
+/** @type {Map<number,number[]>} */
+KCDev.Mirrors.reflectWallPositions = null;
+KCDev.Mirrors.currMapId = -1;
 
 (() => {
     const script = document.currentScript;
@@ -559,22 +562,54 @@ KCDev.Mirrors.parameters.eventDefault.reflectWall = false;
     const /** @type {KCMirrorParams} */ parameters = PluginManagerEx.createParameter(script);
 
     if (parameters.zValue !== undefined) {
-        KCDev.Mirrors.parameters.zValue = parameters.zValue;
+        KCDev.Mirrors.zValue = parameters.zValue;
     }
     if (parameters.maxWallDistance !== undefined) {
-        KCDev.Mirrors.parameters.maxWallDistance = parameters.maxWallDistance;
+        KCDev.Mirrors.maxWallDistance = parameters.maxWallDistance;
     }
     if (parameters.wallReflectType) {
-        KCDev.Mirrors.parameters.wallReflectType = parameters.wallReflectType;
+        KCDev.Mirrors.wallReflectType = parameters.wallReflectType;
     }
 
-    KCDev.Mirrors.parameters.actorDefault = parameters.actorDefault;
-    KCDev.Mirrors.parameters.eventDefault = parameters.eventDefault;
+    KCDev.Mirrors.actorDefault = parameters.actorDefault;
+    KCDev.Mirrors.eventDefault = parameters.eventDefault;
+    KCDev.Mirrors.wallRegions = new Set(parameters.wallRegions);
+    KCDev.Mirrors.noReflectRegions = new Set(parameters.noReflectRegions);
+
+    // plugin commands
+    PluginManagerEx.registerCommand(script, 'changeEventReflect', function (args) {
+        KCDev.Mirrors.setEventReflect.apply(this, KCDev.Mirrors.convertChangeReflectArgs($gameMap.event(this.eventId()), args));
+    });
+
+    PluginManagerEx.registerCommand(script, 'changeActorReflect', function (args) {
+        const actorId = getRealActorId(args.id);
+        const actor = $gameActors.actor(actorId);
+        args.id = actorId;
+        KCDev.Mirrors.setActorReflect(...KCDev.Mirrors.convertChangeReflectArgs(actor, args));
+    });
+
+    PluginManagerEx.registerCommand(script, 'resetEventReflect', function (args) {
+        KCDev.Mirrors.resetEventReflectImage.call(this, args.id);
+    });
+
+    PluginManagerEx.registerCommand(script, 'resetActorReflect', function (args) {
+        KCDev.Mirrors.resetActorReflectImage.call(this, args.id);
+    });
+
+    PluginManagerEx.registerCommand(script, 'refreshReflectMap', function (args) {
+        KCDev.Mirrors.refreshReflectWallCache();
+    });
+
+    PluginManagerEx.registerCommand(script, 'setWallReflectMode', function (args) {
+        KCDev.Mirrors.setWallReflectMode(args.mode);
+    });
+
+    PluginManagerEx.registerCommand(script, 'overrideMapSettings', function (args) {
+        KCDev.Mirrors.overrideMapSettings(args.reflectFloor, args.reflectWall, args.mode);
+    });
 
 })();
 
-KCDev.Mirrors.wallRegions = new Set(KCDev.Mirrors.parameters.wallRegions);
-KCDev.Mirrors.noReflectRegions = new Set(KCDev.Mirrors.parameters.noReflectRegions);
 KCDev.Mirrors.wallModes = {
     perspective: 1,
     event: 2
@@ -591,7 +626,7 @@ KCDev.Mirrors.wallModes = {
  * behind the tileset layer.
  * 
  */
- KCDev.Mirrors.Sprite_Reflect = class Sprite_Reflect extends Sprite_Character {
+KCDev.Mirrors.Sprite_Reflect = class Sprite_Reflect extends Sprite_Character {
 
     /**
      * 
@@ -603,7 +638,7 @@ KCDev.Mirrors.wallModes = {
         this.anchor.x = 0.5;
         this.anchor.y = 1;
         this.parentSprite = parentCharSprite;
-        this.z = 2 * KCDev.Mirrors.parameters.zValue;
+        this.z = 2 * KCDev.Mirrors.zValue;
         this._character = parentCharSprite._character;
     }
 
@@ -700,7 +735,7 @@ KCDev.Mirrors.resetEventReflectImage = function (eventId) {
  * @param {number} actorId ID of the actor or party member index
  * @returns {number}
  */
-function getRealActorId(actorId) {
+KCDev.Mirrors.getRealActorId = function (actorId) {
     if (actorId < 1) {
         if (actorId === 0) {
             if ($gameParty.size() > 0) {
@@ -720,7 +755,7 @@ function getRealActorId(actorId) {
         }
     }
     return actorId;
-}
+};
 
 /**
  * Set reflection properties of an actor.
@@ -733,7 +768,7 @@ function getRealActorId(actorId) {
  * @param {number|undefined} wallOpacity Set wall reflection opacity
  */
 KCDev.Mirrors.setActorReflect = function (actorId, reflectChar, reflectIndex, enableFloor, enableWall, floorOpacity, wallOpacity) {
-    const realId = getRealActorId(actorId);
+    const realId = KCDev.Mirrors.getRealActorId(actorId);
     if (realId < 0) return;
     const actor = $gameActors.actor(realId);
     if (actor) {
@@ -751,7 +786,7 @@ KCDev.Mirrors.setActorReflect = function (actorId, reflectChar, reflectIndex, en
  * @returns {void}
  */
 KCDev.Mirrors.resetActorReflectImage = function (actorId) {
-    const realId = getRealActorId(actorId);
+    const realId = KCDev.Mirrors.getRealActorId(actorId);
     if (realId < 0) return;
     const actor = $gameActors.actor(realId);
     if (actor) {
@@ -765,9 +800,9 @@ KCDev.Mirrors.resetActorReflectImage = function (actorId) {
  * Sets the wall reflection variable type to a new value.
  * @param {string} mode New wall reflection mode.
  */
-KCDev.Mirrors.setWallReflectMode = function (mode = KCDev.Mirrors.parameters.wallReflectType) {
-    if (KCDev.Mirrors.parameters.wallReflectVar) {
-        $gameVariables.setValue(KCDev.Mirrors.parameters.wallReflectVar, mode);
+KCDev.Mirrors.setWallReflectMode = function (mode = KCDev.Mirrors.wallReflectType) {
+    if (KCDev.Mirrors.wallReflectVar) {
+        $gameVariables.setValue(KCDev.Mirrors.wallReflectVar, mode);
     }
 };
 
@@ -777,13 +812,13 @@ KCDev.Mirrors.setWallReflectMode = function (mode = KCDev.Mirrors.parameters.wal
  * @returns {number}
  */
 KCDev.Mirrors.getWallReflectMode = function () {
-    if (KCDev.Mirrors.parameters.wallReflectVar) {
-        const val = $gameVariables.value(KCDev.Mirrors.parameters.wallReflectVar);
+    if (KCDev.Mirrors.wallReflectVar) {
+        const val = $gameVariables.value(KCDev.Mirrors.wallReflectVar);
         if (KCDev.Mirrors.wallModes[val]) {
             return KCDev.Mirrors.wallModes[val];
         }
     }
-    return KCDev.Mirrors.wallModes[KCDev.Mirrors.parameters.wallReflectType];
+    return KCDev.Mirrors.wallModes[KCDev.Mirrors.wallReflectType];
 };
 
 /**
@@ -800,7 +835,7 @@ KCDev.Mirrors.getWallReflectMode = function () {
  * @param {number | string} args.reflectWallOpacity Wall opacity to use for the reflection
  * @returns {Array<any>}
  */
-function convertChangeReflectArgs(char, args) {
+KCDev.Mirrors.convertChangeReflectArgs = function (char, args) {
 
     if (!char) { // create a fake character with the desired functions if no character is passed in
         char = {
@@ -810,7 +845,7 @@ function convertChangeReflectArgs(char, args) {
             reflectWall() { return false; },
             reflectFloorOpacity() { return undefined; },
             setReflectWallOpacity() { return undefined; }
-        }
+        };
     }
 
     const id = args.id;
@@ -821,7 +856,7 @@ function convertChangeReflectArgs(char, args) {
     const reflectFloorOpacity = typeof (args.reflectFloorOpacity) !== 'number' ? char.reflectFloorOpacity() : (args.reflectFloorOpacity === -1 ? undefined : args.reflectFloorOpacity);
     const reflectWallOpacity = typeof (args.reflectWallOpacity) !== 'number' ? char.reflectWallOpacity() : (args.reflectWallOpacity === -1 ? undefined : args.reflectWallOpacity);
     return [id, character.trim(), index, reflectFloor, reflectWall, reflectFloorOpacity, reflectWallOpacity]
-}
+};
 
 /**
  * Overrides map settings. These params are usually controlled through note tags
@@ -855,37 +890,6 @@ KCDev.Mirrors.overrideMapSettings = function (floorEnabled = 'unchanged', wallEn
         }
     }
 };
-
-PluginManagerEx.registerCommand(script, 'changeEventReflect', function (args) {
-    KCDev.Mirrors.setEventReflect.apply(this, convertChangeReflectArgs($gameMap.event(this.eventId()), args));
-});
-
-PluginManagerEx.registerCommand(script, 'changeActorReflect', function (args) {
-    const actorId = getRealActorId(args.id);
-    const actor = $gameActors.actor(actorId);
-    args.id = actorId;
-    KCDev.Mirrors.setActorReflect(...convertChangeReflectArgs(actor, args));
-});
-
-PluginManagerEx.registerCommand(script, 'resetEventReflect', function (args) {
-    KCDev.Mirrors.resetEventReflectImage.call(this, args.id);
-});
-
-PluginManagerEx.registerCommand(script, 'resetActorReflect', function (args) {
-    KCDev.Mirrors.resetActorReflectImage.call(this, args.id);
-});
-
-PluginManagerEx.registerCommand(script, 'refreshReflectMap', function (args) {
-    KCDev.Mirrors.refreshReflectWallCache();
-});
-
-PluginManagerEx.registerCommand(script, 'setWallReflectMode', function (args) {
-    KCDev.Mirrors.setWallReflectMode(args.mode);
-});
-
-PluginManagerEx.registerCommand(script, 'overrideMapSettings', function (args) {
-    KCDev.Mirrors.overrideMapSettings(args.reflectFloor, args.reflectWall, args.mode);
-});
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // END EVENT COMMAND DEFINITIONS                                                                              //
@@ -1077,7 +1081,7 @@ Game_CharacterBase.prototype.setReflectWallOpacity = function (opacity) {
  * @param {Game_Character} character Current character representing the actor
  * @returns {void}
  */
-function updateActorCharacterReflect(actor, character) {
+KCDev.Mirrors.updateActorCharacterReflect = function (actor, character) {
     if (!actor) return;
     let needsUpdate = false;
     let reflectName = character.reflectName();
@@ -1108,7 +1112,7 @@ KCDev.Mirrors.Game_Actor_setup = Game_Actor.prototype.setup;
 Game_Actor.prototype.setup = function (actorId) {
     KCDev.Mirrors.Game_Actor_setup.apply(this, arguments);
     const actor = $dataActors[actorId];
-    parseMetaValues(this, actor, KCDev.Mirrors.parameters.actorDefault, true);
+    KCDev.Mirrors.parseMetaValues(this, actor, KCDev.Mirrors.actorDefault, true);
 };
 
 // Add reflection methods to Game_Actor for convenience
@@ -1144,7 +1148,7 @@ KCDev.Mirrors.Game_Follower_update = Game_Follower.prototype.update;
  */
 Game_Follower.prototype.update = function () {
     KCDev.Mirrors.Game_Follower_update.apply(this, arguments);
-    updateActorCharacterReflect(this.actor(), this);
+    KCDev.Mirrors.updateActorCharacterReflect(this.actor(), this);
 };
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -1164,7 +1168,7 @@ Game_Player.prototype.update = function () {
     KCDev.Mirrors.Game_Player_update.apply(this, arguments);
     if ($gameParty.size() > 0) {
         const actor = $gameParty.leader();
-        updateActorCharacterReflect(actor, this);
+        KCDev.Mirrors.updateActorCharacterReflect(actor, this);
     }
 };
 
@@ -1183,7 +1187,7 @@ KCDev.Mirrors.Game_Event_setupPage = Game_Event.prototype.setupPage;
  */
 Game_Event.prototype.setupPage = function () {
     KCDev.Mirrors.Game_Event_setupPage.apply(this, arguments);
-    parseMetaValues(this, this.event(), KCDev.Mirrors.parameters.eventDefault)
+    KCDev.Mirrors.parseMetaValues(this, this.event(), KCDev.Mirrors.eventDefault)
 };
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -1197,7 +1201,7 @@ Game_Event.prototype.setupPage = function () {
  * @param {{reflectFloor: boolean, reflectWall: boolean}} defaults Default values for floor and wall reflections for the target object
  * @param {boolean} isActor Actors and events use different reflection characters!
  */
-function parseMetaValues(reflectableObj, target, defaults, isActor = false) {
+KCDev.Mirrors.parseMetaValues = function (reflectableObj, target, defaults, isActor = false) {
     const refChar = isActor ? 'Reflect_Actor' : 'Reflect_Char';
     const refIdx = 'Reflect_Index';
     const refType = 'Reflect_Type';
@@ -1243,7 +1247,7 @@ function parseMetaValues(reflectableObj, target, defaults, isActor = false) {
 // START Game_Map edits                                                                                       //
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-function setupMapReflectOptions() {
+KCDev.Mirrors.setupMapReflectOptions = function () {
     const refType = 'Reflect_Type';
     const reflect = PluginManagerEx.findMetaValue($dataMap, [refType, refType.toLowerCase(), refType.toUpperCase()])?.trim().toUpperCase();
     $gameMap.setReflectWall(reflect === 'WALL' || reflect === 'ALL' || reflect === undefined);
@@ -1273,8 +1277,9 @@ KCDev.Mirrors.Game_Map_refresh = Game_Map.prototype.refresh;
 Game_Map.prototype.refresh = function () {
     KCDev.Mirrors.Game_Map_refresh.apply(this, arguments);
     if (this._reflectFloor === undefined) {
-        setupMapReflectOptions();
+        KCDev.Mirrors.setupMapReflectOptions();
     }
+    KCDev.Mirrors.refreshReflectWallCache();
 };
 
 KCDev.Mirrors.Game_Map_setup = Game_Map.prototype.setup;
@@ -1285,7 +1290,7 @@ KCDev.Mirrors.Game_Map_setup = Game_Map.prototype.setup;
  */
 Game_Map.prototype.setup = function (mapId) {
     KCDev.Mirrors.Game_Map_setup.apply(this, arguments);
-    setupMapReflectOptions();
+    KCDev.Mirrors.setupMapReflectOptions();
 };
 
 /**
@@ -1399,7 +1404,7 @@ Sprite_Character.prototype.updateReflectFloor = function () {
         r.scale.x = -this.scale.x;
         r.scale.y = this.scale.y;
         r.y += char.jumpHeight() * 1.25;
-        handleReflectFrame.call(this, r);
+        KCDev.Mirrors.handleReflectFrame.call(this, r);
     }
 };
 
@@ -1407,15 +1412,15 @@ Sprite_Character.prototype.updateReflectFloor = function () {
  * Rebuilds and sets wall reflection cache for current map.
  */
 KCDev.Mirrors.refreshReflectWallCache = function () {
-    KCDev.Mirrors.reflectWallPositions = buildCurrentMapCache();
-}
+    KCDev.Mirrors.reflectWallPositions = KCDev.Mirrors.buildCurrentMapCache();
+};
 
 /**
  * Returns the reflectable wall region map for the current game map
  * For performance, we pre-compute the closest wall region for every tile on the map
  * @returns {Map<number, number[]}
  */
-function buildCurrentMapCache() {
+KCDev.Mirrors.buildCurrentMapCache = function () {
     const /** @type {Map<number, number[]} */ regionMap = new Map();
 
     for (let i = $gameMap.width() - 1; i >= 0; i--) {
@@ -1437,7 +1442,7 @@ function buildCurrentMapCache() {
     }
 
     return regionMap;
-}
+};
 
 /**
  * Gets the y coordinate of the closest tile with a wall reflection region that is above point (x,y)
@@ -1445,7 +1450,7 @@ function buildCurrentMapCache() {
  * @param {number} x 
  * @param {number} y 
  */
-function getWallY(x, y) {
+KCDev.Mirrors.getWallY = function (x, y) {
     const mapId = $gameMap.mapId();
 
     if (KCDev.Mirrors.currMapId !== mapId) {
@@ -1461,7 +1466,7 @@ function getWallY(x, y) {
     else {
         return -1;
     }
-}
+};
 
 /**
  * New method: Sprite_Character.prototype.updateReflectWall
@@ -1480,7 +1485,7 @@ Sprite_Character.prototype.updateReflectWall = function () {
 
     if (r.visible) {
         this.updateReflectCommon(r);
-        const wallY = getWallY(charX, charY);
+        const wallY = KCDev.Mirrors.getWallY(charX, charY);
         r.visible = (wallY >= 0);
         if (r.visible) {
             r.opacity = o === undefined ? this.opacity : o;
@@ -1494,7 +1499,7 @@ Sprite_Character.prototype.updateReflectWall = function () {
             if (isPerspectiveMode) {
                 r.y = this.y - tileH * distToWall - distToWall;
 
-                let scale = 1 - (distToWall - 1) / KCDev.Mirrors.parameters.maxWallDistance;
+                let scale = 1 - (distToWall - 1) / KCDev.Mirrors.maxWallDistance;
                 if (scale > 1) {
                     scale = 1;
                 }
@@ -1514,7 +1519,7 @@ Sprite_Character.prototype.updateReflectWall = function () {
                 r.scale.y = this.scale.y;
                 r.y -= char.jumpHeight();
             }
-            handleReflectFrame.call(this, r);
+            KCDev.Mirrors.handleReflectFrame.call(this, r);
 
         }
     }
@@ -1554,7 +1559,7 @@ Sprite_Character.prototype.isImageChanged = function () {
  * Handles drawing either a tile or a character
  * @param {KCDev.Mirrors.Sprite_Reflect} r Reflection sprite to be modified
  */
-function handleReflectFrame(r) {
+KCDev.Mirrors.handleReflectFrame = function (r) {
     if (this._tileId > 0 && this._characterName === r._characterName) {
         r._tileId = this._tileId;
         r.bitmap = this.bitmap;
@@ -1562,7 +1567,7 @@ function handleReflectFrame(r) {
         r.updateTileFrame();
     }
     else {
-        setReflectFrame(r);
+        KCDev.Mirrors.setReflectFrame(r);
     }
 }
 
@@ -1570,7 +1575,7 @@ function handleReflectFrame(r) {
  * Switches to the appropriate frame for the reflection sprite
  * @param {Sprite_Character} r Reflection sprite
  */
-function setReflectFrame(r) {
+KCDev.Mirrors.setReflectFrame = function (r) {
     const pw = r.patternWidth();
     const ph = r.patternHeight();
     const sx = (r.characterBlockX() + r.characterPatternX()) * pw;
@@ -1578,7 +1583,7 @@ function setReflectFrame(r) {
     r.setFrame(sx, sy, pw, ph);
 }
 
-        ////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-        // END Sprite_Character edits                                                                                 //
-        ////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// END Sprite_Character edits                                                                                 //
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
