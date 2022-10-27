@@ -31,12 +31,14 @@ SOFTWARE.
  * @base PluginCommonBase
  * @orderafter PluginCommonBase
  *
- * @plugindesc [v1.3]Add reflections to events and actors.
+ * @plugindesc [v1.3.1]Add reflections to events and actors.
  *
  * @help
  * KC_Mirrors.js
  * 
  * Changelog: 
+       v1.3.1 - 2022/10/26
+	       - Quick fix to CharReflections Filter Controller target
  *     v1.3.0 - 2022/10/26
  *         - Added FilterControllerMZ targets
  *           | CharReflectionsFloor - Applies filter to all floor reflections
@@ -2011,7 +2013,14 @@ if (window.Filter_Controller) {
     };
 
     targetGetter[Type.CharReflections] = function (targetIds) {
-        return Filter_Controller.targetGetter[Filter_Controller.targetType['CharReflectionsFloor']]().concat(Filter_Controller.targetGetter[Filter_Controller.targetType['CharReflectionsWall']]());
+        const targets = [];
+        if (this._spriteset) {
+            if (this._spriteset._characterSprites) {
+                this._spriteset._characterSprites.forEach(sprite => {targets.push(sprite._reflectionWall); targets.push(sprite._reflectionFloor)});
+            }
+            
+        }
+        return targets;
     };
 
     // dummy out this function
