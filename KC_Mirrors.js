@@ -295,13 +295,13 @@ SOFTWARE.
  * 
  * The commands are as follows:
  * 
- * setEventReflect(event_id, reflection_filename, reflection_index, floor_enabled, wall_enabled, floor_opacity, wall_opacity)
+ * setEventReflect(event_id, reflection_filename, reflection_index, floor_enabled, wall_enabled, floor_opacity, wall_opacity, floor_x_offset, floor_y_offset, wall_x_offset, wall_y_offset)
  *   | Same as Change Event Reflection command
  * 
  * resetEventReflectImage(event_id)
  *   | Same as Match Event Reflection command
  * 
- * setActorReflect(actor_id, reflection_filename, reflection_index, floor_enabled, wall_enabled, floor_opacity, wall_opacity)
+ * setActorReflect(actor_id, reflection_filename, reflection_index, floor_enabled, wall_enabled, floor_opacity, wall_opacity, floor_x_offset, floor_y_offset, wall_x_offset, wall_y_offset)
  *   | Same as Change Actor Reflection command
  * 
  * resetActorReflectImage(actor_id)
