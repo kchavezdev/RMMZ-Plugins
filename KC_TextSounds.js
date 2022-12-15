@@ -41,7 +41,7 @@
  *   v1.0.1 - 2022/10/14
  *     - Fixed frequency being off by 1
  * 
- *   v1.1.0 - TBD
+ *   v1.1.0 - 2022/15/2022
  *     - Added \SEPLAY text code to immediately play the currently-loaded text
  *       sound
  *     - Restructured code to be in-line with current internal
@@ -138,9 +138,9 @@
  * | Load the parameters of the preset with the name x for the rest of the
  *   text box.
  * 
- * \SEPLAY
- * | Play the currently loaded text SE. This also resets the counter that keeps
- *   track of how often to play a sound to avoid sounds playing out of rhythm.
+ * \SEPLAY[x]
+ * | Play the se defined in the preset name x. Leave x blank to play the
+ *   currently loaded text SE. Keep the brackets, however.
  *
  * @param generalSound
  * @text General Sound
@@ -581,7 +581,7 @@ Window_Message.prototype.processEscapeCharacter = function (code, textState) {
             break;
 
         case "SEPLAY":
-            AudioManager.playSe($gameMessage.textSe());
+            AudioManager.playSe(KCDev.TextSounds.presets.get(KCDev.TextSounds.obtainEscapeParamString(textState)) || $gameMessage.textSe())
             $gameMessage.resetTextSeCounter();
             break;
             
