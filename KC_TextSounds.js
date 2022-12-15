@@ -27,28 +27,41 @@
  * @url https://github.com/kchavezdev/RMMZ-Plugins
  * @target MZ MV
  *
- * @plugindesc [v1.0.1]Play text sound effects based on face graphic.
+ * @plugindesc [v1.1]Play text sound effects based on face graphic.
  *
  * @help
  * KC_TextSounds.js
  * 
+ * This plugin plays SEs as text is displayed in message boxes.
+ * 
  * Changelog:
- *   v1.0.0 - 2022/22/08
+ *   v1.0.0 - 2022/08/22
  *     - Initial release
  * 
- *   v1.0.1 - 2022/14/10
+ *   v1.0.1 - 2022/10/14
  *     - Fixed frequency being off by 1
  * 
  *   v1.1.0 - TBD
+ *     - Added \SEPLAY text code to immediately play the currently-loaded text
+ *       sound
  *     - Restructured code to be in-line with current internal
  *       coding practices
- *     - Plugin now always plays a blip on the first character if the
- *       frequency is above 0. Added a toggle in the parameters to use
- *       old behavior for backwards compatibility.
+ *     - Plugin now always plays an SE on the first character if the
+ *       frequency is above 0 or if the frequency is changed mid-message.
+ *         + Added a toggle in the parameters to use old behavior for
+ *           backwards compatibility.
+ *     - Updated plugin help with known compatibility problems
  * 
- * This plugin plays SEs as text is displayed in message boxes.
+ * Known Compatibility Issues:
+ *   - Message Log VisuStella MZ
+ *     + Issue:
+ *         | KC_TextSounds text code parameters remain in the message log
+ *     + Known Fixes:
+ *         | None
  * 
- * -----------------------------Plugin Parameters-----------------------------
+ * 
+ * 
+ * -----------------------------Plugin Parameters------------------------------
  * 
  * The most basic structure of this plugin is an object that holds the SE's 
  * name, volume, minimum pitch, maximum pitch, pan, and frequency. Name,
@@ -113,7 +126,7 @@
  * 
  * \SEPI[x,y]
  * | Change the minimum pitch to x and the maximum pitch to y for the rest of
- * | the text box.
+ *   the text box.
  * 
  * \SEPIMIN[x]
  * | Change the min pitch of the text sound to x for the rest of the text box.
@@ -123,7 +136,11 @@
  * 
  * \SEPRE[x]
  * | Load the parameters of the preset with the name x for the rest of the
- * | text box.
+ *   text box.
+ * 
+ * \SEPLAY
+ * | Play the currently loaded text SE. This also resets the counter that keeps
+ *   track of how often to play a sound to avoid sounds playing out of rhythm.
  *
  * @param generalSound
  * @text General Sound
@@ -147,6 +164,12 @@
  * @desc When this game switch is ON, all text sounds are disabled. This feature is optional.
  * @type switch
  * @default 0
+ * 
+ * @param useOldFreqBehavior
+ * @text Don't Play on 1st Letter
+ * @desc Enabling this will use the pre-v1.1.0 behavior where the text SE would not play on the first character.
+ * @type boolean
+ * @default false
  * 
  */
 /*~struct~PresetSound:
@@ -239,14 +262,15 @@ var KCDev = KCDev || {};
 KCDev.TextSounds = {};
 
 KCDev.TextSounds.Text_Sound = class Text_Sound {
+
     constructor(name = '', volume = 90, maxPitch = 100, minPitch = 100, pan = 0, frequency = 0) {
-            // declare private variables here and note types via jsdoc
-            /**@private @type {string} */ this._seName;
-            /**@private @type {number} */ this._volume;
-            /**@private @type {number} */ this._maxPitch;
-            /**@private @type {number} */ this._minPitch;
-            /**@private @type {number} */ this._pan;
-            /**@private @type {number} */ this._freq;
+        // declare private variables here and note types via jsdoc
+        /**@private @type {string} */ this._seName;
+        /**@private @type {number} */ this._volume;
+        /**@private @type {number} */ this._maxPitch;
+        /**@private @type {number} */ this._minPitch;
+        /**@private @type {number} */ this._pan;
+        /**@private @type {number} */ this._freq;
 
         // handle setting values here to allow proper clamping for numbers
         this.name = name;
@@ -347,7 +371,7 @@ KCDev.TextSounds.addConfig = function (faceName, textSe, ...indexes) {
 
 /**
  * @param {string} faceName 
- * @param {Text_Sound} textSe 
+ * @param {KCDev.TextSounds.Text_Sound} textSe 
  * @param {Bitmap} bitmap 
  */
 KCDev.TextSounds.addConfigToEveryIndex = function (faceName, textSe, bitmap) {
@@ -362,15 +386,17 @@ KCDev.TextSounds.addConfigToEveryIndex = function (faceName, textSe, bitmap) {
 };
 
 KCDev.TextSounds.disableSwitchId = 0;
-KCDev.TextSounds.faceMap = /**@type {Map<string, Map<number,Text_Sound>} */ new Map();
-KCDev.TextSounds.presets = /**@type {Map<String, KCDev.TextSounds.Text_Sound} */ new Map();
-KCDev.TextSounds.generalSound = KCDev.TextSounds.convertTextSoundParam({});
+/**@type {Map<string, Map<number, KCDev.TextSounds.Text_Sound>>} */ KCDev.TextSounds.faceMap = new Map();
+/**@type {Map<string, KCDev.TextSounds.Text_Sound>} */ KCDev.TextSounds.presets = new Map();
+KCDev.TextSounds.generalSound = new KCDev.TextSounds.Text_Sound();
+
+KCDev.TextSounds.useNewFreqBehavior = true;
 
 // handle plugin parameters
 (() => {
 
     const script = document.currentScript.src.split("/").pop().replace(/\.js$/, "");
-    
+
     const presets = KCDev.TextSounds.presets;
 
     const parameters = PluginManager.parameters(script);
@@ -406,7 +432,7 @@ KCDev.TextSounds.generalSound = KCDev.TextSounds.convertTextSoundParam({});
         const /**@type {string} */ face = config.face;
         const indexesParam = parseNoError(config.indexes);
         const /**@type {number[]} */ indexes = Array.isArray(indexesParam) ? indexesParam : [];
-        let /**@type {Text_Sound_Param} */ soundInfo;
+        let /**@type {KCDev.TextSounds.Text_Sound_Param} */ soundInfo;
         try {
             soundInfo = parseNoError(config.textSound);
         } catch (error) {
@@ -424,13 +450,15 @@ KCDev.TextSounds.generalSound = KCDev.TextSounds.convertTextSoundParam({});
             ImageManager.loadFace(face).addLoadListener(() => addConfig(face, textSound, ...indexes.map(value => parseInt(value))));
         }
     });
+
+    KCDev.TextSounds.useNewFreqBehavior = parameters.useOldFreqBehavior !== 'true';
 })();
 
 KCDev.TextSounds.Game_Message_initialize = Game_Message.prototype.initialize;
 Game_Message.prototype.initialize = function () {
     KCDev.TextSounds.Game_Message_initialize.apply(this, arguments);
     this._textSe = new KCDev.TextSounds.Text_Sound();
-    this._textSeCounter = 0;
+    this.resetTextSeCounter();
 };
 
 KCDev.TextSounds.Game_Message_clear = Game_Message.prototype.clear;
@@ -456,8 +484,7 @@ Game_Message.prototype.incrementTextSeCounter = function () {
 };
 
 KCDev.TextSounds.getMessageSe = function (faceName, faceIndex) {
-    const /**@type {Map<string,Map<number, KCDev.TextSounds.Text_Sound>} */ m = KCDev.TextSounds.faceMap;
-    const indexes = m.get(faceName);
+    const indexes = KCDev.TextSounds.faceMap.get(faceName);
     const sound = (indexes && indexes.get(faceIndex)) || KCDev.TextSounds.generalSound;
     return sound.clone(); // we clone the sound info in case text code overrides are used
 };
@@ -468,7 +495,7 @@ KCDev.TextSounds.useMessageSe = function () {
 
 Game_Message.prototype.setupTextSe = function () {
     this._textSe = (KCDev.TextSounds.useMessageSe()) ? KCDev.TextSounds.getMessageSe(this.faceName(), this.faceIndex()) : new KCDev.TextSounds.Text_Sound();
-    this.resetTextSeCounter();
+    if (KCDev.TextSounds.useNewFreqBehavior) this._textSeCounter = this.textSe().frequency;
 };
 
 KCDev.TextSounds.Game_Message_setFaceImage = Game_Message.prototype.setFaceImage;
@@ -477,9 +504,8 @@ Game_Message.prototype.setFaceImage = function (faceName, faceIndex) {
     this.setupTextSe();
 };
 
-KCDev.TextSounds.Window_Message_processCharacter = Window_Message.prototype.processCharacter;
-Window_Message.prototype.processCharacter = function (textState) {
-    const c = textState.text[textState.index];
+Window_Message.prototype.processCharacterSe = function (textState) {
+    const /**@type {string} */ c = textState.text[textState.index];
     if (c.charCodeAt(0) >= 0x20) {
         $gameMessage.incrementTextSeCounter();
         if (c.match(/\S/g)) {
@@ -490,6 +516,11 @@ Window_Message.prototype.processCharacter = function (textState) {
             }
         }
     }
+};
+
+KCDev.TextSounds.Window_Message_processCharacter = Window_Message.prototype.processCharacter;
+Window_Message.prototype.processCharacter = function (textState) {
+    this.processCharacterSe(textState);
     KCDev.TextSounds.Window_Message_processCharacter.apply(this, arguments);
 };
 
@@ -511,21 +542,29 @@ Window_Message.prototype.processEscapeCharacter = function (code, textState) {
         case "SEN":
             $gameMessage.textSe().name = KCDev.TextSounds.obtainEscapeParamString(textState);
             break;
+
         case "SEF":
-            $gameMessage.textSe().frequency = this.obtainEscapeParam(textState);
+            const /**@type {KCDev.TextSounds.Text_Sound} */ sef = $gameMessage.textSe();
+            sef.frequency = this.obtainEscapeParam(textState);
+            if (KCDev.TextSounds.useNewFreqBehavior) $gameMessage._textSeCounter = sef.frequency;
             break;
+            
         case "SEPA":
             $gameMessage.textSe().pan = parseInt(KCDev.TextSounds.obtainEscapeParamString(textState));
             break;
+
         case "SEV":
             $gameMessage.textSe().volume = this.obtainEscapeParam(textState);
             break;
+
         case "SEPIMAX":
             $gameMessage.textSe().maxPitch = this.obtainEscapeParam(textState);
             break;
+
         case "SEPIMIN":
             $gameMessage.textSe().minPitch = this.obtainEscapeParam(textState);
             break;
+
         case "SEPI":
             const pitchParams = KCDev.TextSounds.obtainEscapeParamString(textState).split(',');
             const min = parseInt(pitchParams[0]);
@@ -533,11 +572,20 @@ Window_Message.prototype.processEscapeCharacter = function (code, textState) {
             $gameMessage.textSe().minPitch = min;
             $gameMessage.textSe().maxPitch = max;
             break;
+
         case "SEPRE":
-            const /**@type {KCDev.TextSounds.Text_Sound} */ preset = KCDev.TextSounds.presets.get(KCDev.TextSounds.obtainEscapeParamString(textState));
+            const preset = KCDev.TextSounds.presets.get(KCDev.TextSounds.obtainEscapeParamString(textState));
             if (preset) {
                 $gameMessage._textSe = preset.clone();
             }
+            break;
+
+        case "SEPLAY":
+            AudioManager.playSe($gameMessage.textSe());
+            $gameMessage.resetTextSeCounter();
+            break;
+            
+        default:
             break;
     }
 };
