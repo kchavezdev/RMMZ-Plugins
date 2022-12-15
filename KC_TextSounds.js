@@ -41,7 +41,7 @@
  *   v1.0.1 - 2022/10/14
  *     - Fixed frequency being off by 1
  * 
- *   v1.1.0 - 2022/15/2022
+ *   v1.1.0 - 2022/12/15
  *     - Added \SEPLAY text code to immediately play the currently-loaded text
  *       sound
  *     - Restructured code to be in-line with current internal
