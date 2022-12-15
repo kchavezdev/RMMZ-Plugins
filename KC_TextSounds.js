@@ -37,7 +37,14 @@
  *     - Initial release
  * 
  *   v1.0.1 - 2022/14/10
- *     - Fixed frequency being off by 1.
+ *     - Fixed frequency being off by 1
+ * 
+ *   v1.1.0 - TBD
+ *     - Restructured code to be in-line with current internal
+ *       coding practices
+ *     - Plugin now always plays a blip on the first character if the
+ *       frequency is above 0. Added a toggle in the parameters to use
+ *       old behavior for backwards compatibility.
  * 
  * This plugin plays SEs as text is displayed in message boxes.
  * 
@@ -231,10 +238,8 @@ var KCDev = KCDev || {};
 
 KCDev.TextSounds = {};
 
-(($) => {
-
-    class Text_Sound {
-        constructor(name = '', volume = 90, maxPitch = 100, minPitch = 100, pan = 0, frequency = 0) {
+KCDev.TextSounds.Text_Sound = class Text_Sound {
+    constructor(name = '', volume = 90, maxPitch = 100, minPitch = 100, pan = 0, frequency = 0) {
             // declare private variables here and note types via jsdoc
             /**@private @type {string} */ this._seName;
             /**@private @type {number} */ this._volume;
@@ -243,294 +248,296 @@ KCDev.TextSounds = {};
             /**@private @type {number} */ this._pan;
             /**@private @type {number} */ this._freq;
 
-            // handle setting values here to allow proper clamping for numbers
-            this.name = name;
-            this.volume = volume;
-            this.maxPitch = maxPitch;
-            this.minPitch = minPitch;
-            this.pan = pan;
-            this.frequency = frequency;
-        }
-
-        get name() {
-            return this._seName;
-        }
-
-        set name(name) {
-            this._seName = name;
-        }
-
-        get volume() {
-            return this._volume;
-        }
-
-        set volume(volume) {
-            this._volume = volume.clamp(0, 100);
-        }
-
-        get maxPitch() {
-            return this._maxPitch;
-        }
-
-        set maxPitch(pitch) {
-            this._maxPitch = pitch.clamp(50, 150);
-        }
-
-        get minPitch() {
-            return this._minPitch;
-        }
-
-        set minPitch(pitch) {
-            this._minPitch = pitch.clamp(50, 150);
-        }
-
-        get pan() {
-            return this._pan;
-        }
-
-        set pan(pan) {
-            this._pan = pan.clamp(-100, 100);
-        }
-
-        get frequency() {
-            return this._freq;
-        }
-
-        set frequency(frequency) {
-            this._freq = frequency.clamp(0, Infinity);
-        }
-
-        get pitch() {
-            return Math.floor(Math.random() * (this.maxPitch - this.minPitch) + this.minPitch);
-        }
-
-        clone() {
-            return new Text_Sound(this.name, this.volume, this.maxPitch, this.minPitch, this.pan, this.frequency);
-        }
-
-    };
-
-    $.Text_Sound = Text_Sound;
-
-    // do basic setup when game launches
-    (() => {
-
-        const script = document.currentScript.src.split("/").pop().replace(/\.js$/, "");
-
-        $.faceMap = new Map();
-        $.presets = new Map();
-        const /**@type {Map<string,Map<number,Text_Sound>} */ m = $.faceMap;
-        const /**@type {Map<String,Text_Sound} */ presets = $.presets;
-
-        const parameters = PluginManager.parameters(script);
-
-        $.disableSwitchId = parseInt(parameters.disableSwitchId) || 0;
-
-        /**
-         * @typedef {Object} Text_Sound_Param
-         * @property {string} se
-         * @property {number} volume
-         * @property {number} maxPitch
-         * @property {number} minPitch
-         * @property {number} pan
-         * @property {number} frequency
-         */
-
-        /**
-         * @param {Text_Sound_Param} param 
-         * @returns {Text_Sound}
-         */
-        function convertTextSoundParam(param) {
-            return new $.Text_Sound(param.se, parseInt(param.volume), parseInt(param.maxPitch), parseInt(param.minPitch), parseInt(param.pan), parseInt(param.frequency));
-        }
-        $.convertTextSoundParam = convertTextSoundParam;
-
-        function parseNoError(jsonStr) {
-            try {
-                return JSON.parse(jsonStr);
-            } catch (error) {
-                return undefined;
-            }
-        }
-
-        $.generalSound = convertTextSoundParam(parseNoError(parameters.generalSound));
-        parseNoError(parameters.presetSounds).forEach(preset => {
-            preset = parseNoError(preset);
-            presets.set(preset.name, convertTextSoundParam(parseNoError(preset.textSound)));
-        });
-
-        // handle face specific configs
-        const /**@type {[]} */ faceConfigs = parseNoError(parameters.faceSetup);
-
-        /**
-         * @param {string} faceName Name of the face file
-         * @param {number[]} indexes Index this sound should be associated with
-         * @param {Text_Sound} textSe Actual sound effect info
-         */
-        function addConfig(faceName, textSe, ...indexes) {
-            if (!m.has(faceName))
-                m.set(faceName, new Map());
-            const entry = m.get(faceName);
-            indexes.forEach(index => entry.set(index, textSe));
-        }
-        $.addConfig = addConfig;
-
-        /**
-         * @param {string} faceName 
-         * @param {Text_Sound} textSe 
-         * @param {Bitmap} bitmap 
-         */
-        function addConfigToEveryIndex(faceName, textSe, bitmap) {
-            const h = Math.floor(bitmap.height / ImageManager.faceHeight);
-            const w = Math.floor(bitmap.width / ImageManager.faceWidth);
-            const total = h * w;
-            const indexes = [];
-            for (let i = 0; i < total; i++) {
-                indexes.push(i);
-            }
-            addConfig(faceName, textSe, ...indexes);
-        }
-        $.addConfigToEveryIndex = addConfigToEveryIndex;
-
-        faceConfigs.forEach(configParam => {
-            const config = parseNoError(configParam);
-            const /**@type {string} */ face = config.face;
-            const indexesParam = parseNoError(config.indexes);
-            const /**@type {number[]} */ indexes = Array.isArray(indexesParam) ? indexesParam : [];
-            let /**@type {Text_Sound_Param} */ soundInfo;
-            try {
-                soundInfo = parseNoError(config.textSound);
-            } catch (error) {
-                
-            }
-            const preset = presets.get(config.preset);
-            const textSound = preset || convertTextSoundParam(soundInfo);
-            if (indexes.length < 1) {
-                ImageManager.loadFace(face).addLoadListener(bitmap => {
-                    addConfigToEveryIndex(face, textSound, bitmap);
-                });
-            }
-            else {
-                // add as load listener to ensure that preset is loaded first
-                ImageManager.loadFace(face).addLoadListener(() => addConfig(face, textSound, ...indexes.map(value => parseInt(value))));
-            }
-        });
-    })();
-
-    $.Game_Message_initialize = Game_Message.prototype.initialize;
-    Game_Message.prototype.initialize = function () {
-        $.Game_Message_initialize.apply(this, arguments);
-        this._textSe = new $.Text_Sound();
-        this._textSeCounter = 0;
-    };
-
-    $.Game_Message_clear = Game_Message.prototype.clear;
-    Game_Message.prototype.clear = function () {
-        $.Game_Message_clear.apply(this, arguments);
-        this._textSe = new $.Text_Sound();
+        // handle setting values here to allow proper clamping for numbers
+        this.name = name;
+        this.volume = volume;
+        this.maxPitch = maxPitch;
+        this.minPitch = minPitch;
+        this.pan = pan;
+        this.frequency = frequency;
     }
 
-    Game_Message.prototype.textSe = function () {
-        return this._textSe;
-    };
-
-    Game_Message.prototype.resetTextSeCounter = function () {
-        this._textSeCounter = 0;
-    };
-
-    Game_Message.prototype.textSeCounter = function () {
-        return this._textSeCounter;
-    };
-
-    Game_Message.prototype.incrementTextSeCounter = function () {
-        this._textSeCounter++;
-    };
-
-    $.getMessageSe = function (faceName, faceIndex) {
-        const /**@type {Map<string,Map<number,Text_Sound>} */ m = $.faceMap;
-        const indexes = m.get(faceName);
-        const sound = (indexes && indexes.get(faceIndex)) || $.generalSound;
-        return sound.clone(); // we clone the sound info in case text code overrides are used
-    };
-
-    $.useMessageSe = function() {
-        return !($.disableSwitchId > 0 && $gameSwitches.value($.disableSwitchId));
+    get name() {
+        return this._seName;
     }
 
-    Game_Message.prototype.setupTextSe = function () {
-        this._textSe = ($.useMessageSe()) ? $.getMessageSe(this.faceName(), this.faceIndex()) : new $.Text_Sound();
-        this.resetTextSeCounter();
+    set name(name) {
+        this._seName = name;
     }
 
-    $.Game_Message_setFaceImage = Game_Message.prototype.setFaceImage;
-    Game_Message.prototype.setFaceImage = function (faceName, faceIndex) {
-        $.Game_Message_setFaceImage.apply(this, arguments);
-        this.setupTextSe();
-    };
+    get volume() {
+        return this._volume;
+    }
 
-    $.Window_Message_processCharacter = Window_Message.prototype.processCharacter;
-    Window_Message.prototype.processCharacter = function (textState) {
-        const c = textState.text[textState.index];
-        if (c.charCodeAt(0) >= 0x20) {
-            $gameMessage.incrementTextSeCounter();
-            if (c.match(/\S/g)) {
-                const /**@type {Text_Sound} */ se = $gameMessage.textSe();
-                if ($gameMessage.textSeCounter() >= se.frequency) {
-                    if (se.frequency > 0) AudioManager.playSe(se);
-                    $gameMessage.resetTextSeCounter();
-                }
+    set volume(volume) {
+        this._volume = volume.clamp(0, 100);
+    }
+
+    get maxPitch() {
+        return this._maxPitch;
+    }
+
+    set maxPitch(pitch) {
+        this._maxPitch = pitch.clamp(50, 150);
+    }
+
+    get minPitch() {
+        return this._minPitch;
+    }
+
+    set minPitch(pitch) {
+        this._minPitch = pitch.clamp(50, 150);
+    }
+
+    get pan() {
+        return this._pan;
+    }
+
+    set pan(pan) {
+        this._pan = pan.clamp(-100, 100);
+    }
+
+    get frequency() {
+        return this._freq;
+    }
+
+    set frequency(frequency) {
+        this._freq = frequency.clamp(0, Infinity);
+    }
+
+    get pitch() {
+        return Math.floor(Math.random() * (this.maxPitch - this.minPitch) + this.minPitch);
+    }
+
+    clone() {
+        return new Text_Sound(this.name, this.volume, this.maxPitch, this.minPitch, this.pan, this.frequency);
+    }
+
+};
+
+/**
+ * @typedef {Object} KCDev.TextSounds.Text_Sound_Param
+ * @property {string} se
+ * @property {number} volume
+ * @property {number} maxPitch
+ * @property {number} minPitch
+ * @property {number} pan
+ * @property {number} frequency
+ */
+
+/**
+ * @param {KCDev.TextSounds.Text_Sound_Param} param 
+ */
+KCDev.TextSounds.convertTextSoundParam = function (param) {
+    return new KCDev.TextSounds.Text_Sound(param.se, parseInt(param.volume), parseInt(param.maxPitch), parseInt(param.minPitch), parseInt(param.pan), parseInt(param.frequency));
+};
+
+/**
+ * @param {string} faceName Name of the face file
+ * @param {number[]} indexes Index this sound should be associated with
+ * @param {KCDev.TextSounds.Text_Sound} textSe Actual sound effect info
+ */
+KCDev.TextSounds.addConfig = function (faceName, textSe, ...indexes) {
+    const m = KCDev.TextSounds.faceMap;
+    if (!m.has(faceName))
+        m.set(faceName, new Map());
+    const entry = m.get(faceName);
+    indexes.forEach(index => entry.set(index, textSe));
+};
+
+/**
+ * @param {string} faceName 
+ * @param {Text_Sound} textSe 
+ * @param {Bitmap} bitmap 
+ */
+KCDev.TextSounds.addConfigToEveryIndex = function (faceName, textSe, bitmap) {
+    const h = Math.floor(bitmap.height / ImageManager.faceHeight);
+    const w = Math.floor(bitmap.width / ImageManager.faceWidth);
+    const total = h * w;
+    const indexes = [];
+    for (let i = 0; i < total; i++) {
+        indexes.push(i);
+    }
+    KCDev.TextSounds.addConfig(faceName, textSe, ...indexes);
+};
+
+KCDev.TextSounds.disableSwitchId = 0;
+KCDev.TextSounds.faceMap = /**@type {Map<string, Map<number,Text_Sound>} */ new Map();
+KCDev.TextSounds.presets = /**@type {Map<String, KCDev.TextSounds.Text_Sound} */ new Map();
+KCDev.TextSounds.generalSound = KCDev.TextSounds.convertTextSoundParam({});
+
+// handle plugin parameters
+(() => {
+
+    const script = document.currentScript.src.split("/").pop().replace(/\.js$/, "");
+    
+    const presets = KCDev.TextSounds.presets;
+
+    const parameters = PluginManager.parameters(script);
+
+    KCDev.TextSounds.disableSwitchId = parseInt(parameters.disableSwitchId) || 0;
+
+    const convertTextSoundParam = KCDev.TextSounds.convertTextSoundParam;
+
+    function parseNoError(jsonStr) {
+        try {
+            return JSON.parse(jsonStr);
+        } catch (error) {
+            return undefined;
+        }
+    }
+
+    KCDev.TextSounds.generalSound = convertTextSoundParam(parseNoError(parameters.generalSound));
+
+    parseNoError(parameters.presetSounds).forEach(preset => {
+        preset = parseNoError(preset);
+        presets.set(preset.name, convertTextSoundParam(parseNoError(preset.textSound)));
+    });
+
+    // handle face specific configs
+    const /**@type {[]} */ faceConfigs = parseNoError(parameters.faceSetup);
+
+    const addConfig = KCDev.TextSounds.addConfig;
+
+    const addConfigToEveryIndex = KCDev.TextSounds.addConfigToEveryIndex;
+
+    faceConfigs.forEach(configParam => {
+        const config = parseNoError(configParam);
+        const /**@type {string} */ face = config.face;
+        const indexesParam = parseNoError(config.indexes);
+        const /**@type {number[]} */ indexes = Array.isArray(indexesParam) ? indexesParam : [];
+        let /**@type {Text_Sound_Param} */ soundInfo;
+        try {
+            soundInfo = parseNoError(config.textSound);
+        } catch (error) {
+
+        }
+        const preset = presets.get(config.preset);
+        const textSound = preset || convertTextSoundParam(soundInfo);
+        if (indexes.length < 1) {
+            ImageManager.loadFace(face).addLoadListener(bitmap => {
+                addConfigToEveryIndex(face, textSound, bitmap);
+            });
+        }
+        else {
+            // add as load listener to ensure that preset is loaded first
+            ImageManager.loadFace(face).addLoadListener(() => addConfig(face, textSound, ...indexes.map(value => parseInt(value))));
+        }
+    });
+})();
+
+KCDev.TextSounds.Game_Message_initialize = Game_Message.prototype.initialize;
+Game_Message.prototype.initialize = function () {
+    KCDev.TextSounds.Game_Message_initialize.apply(this, arguments);
+    this._textSe = new KCDev.TextSounds.Text_Sound();
+    this._textSeCounter = 0;
+};
+
+KCDev.TextSounds.Game_Message_clear = Game_Message.prototype.clear;
+Game_Message.prototype.clear = function () {
+    KCDev.TextSounds.Game_Message_clear.apply(this, arguments);
+    this._textSe = new KCDev.TextSounds.Text_Sound();
+};
+
+Game_Message.prototype.textSe = function () {
+    return this._textSe;
+};
+
+Game_Message.prototype.resetTextSeCounter = function () {
+    this._textSeCounter = 0;
+};
+
+Game_Message.prototype.textSeCounter = function () {
+    return this._textSeCounter;
+};
+
+Game_Message.prototype.incrementTextSeCounter = function () {
+    this._textSeCounter++;
+};
+
+KCDev.TextSounds.getMessageSe = function (faceName, faceIndex) {
+    const /**@type {Map<string,Map<number, KCDev.TextSounds.Text_Sound>} */ m = KCDev.TextSounds.faceMap;
+    const indexes = m.get(faceName);
+    const sound = (indexes && indexes.get(faceIndex)) || KCDev.TextSounds.generalSound;
+    return sound.clone(); // we clone the sound info in case text code overrides are used
+};
+
+KCDev.TextSounds.useMessageSe = function () {
+    return !(KCDev.TextSounds.disableSwitchId > 0 && $gameSwitches.value(KCDev.TextSounds.disableSwitchId));
+};
+
+Game_Message.prototype.setupTextSe = function () {
+    this._textSe = (KCDev.TextSounds.useMessageSe()) ? KCDev.TextSounds.getMessageSe(this.faceName(), this.faceIndex()) : new KCDev.TextSounds.Text_Sound();
+    this.resetTextSeCounter();
+};
+
+KCDev.TextSounds.Game_Message_setFaceImage = Game_Message.prototype.setFaceImage;
+Game_Message.prototype.setFaceImage = function (faceName, faceIndex) {
+    KCDev.TextSounds.Game_Message_setFaceImage.apply(this, arguments);
+    this.setupTextSe();
+};
+
+KCDev.TextSounds.Window_Message_processCharacter = Window_Message.prototype.processCharacter;
+Window_Message.prototype.processCharacter = function (textState) {
+    const c = textState.text[textState.index];
+    if (c.charCodeAt(0) >= 0x20) {
+        $gameMessage.incrementTextSeCounter();
+        if (c.match(/\S/g)) {
+            const /**@type {KCDev.TextSounds.Text_Sound} */ se = $gameMessage.textSe();
+            if ($gameMessage.textSeCounter() >= se.frequency) {
+                if (se.frequency > 0) AudioManager.playSe(se);
+                $gameMessage.resetTextSeCounter();
             }
         }
-        $.Window_Message_processCharacter.apply(this, arguments);
-    };
+    }
+    KCDev.TextSounds.Window_Message_processCharacter.apply(this, arguments);
+};
 
-    $.obtainEscapeParamString = function(textState) {
-        const regExp = /^\[.*?\]/;
-        const arr = regExp.exec(textState.text.slice(textState.index));
-        if (arr) {
-            textState.index += arr[0].length;
-            return arr[0].slice(1, arr[0].length - 1);
-        } else {
-            return "";
-        }
-    };
+KCDev.TextSounds.obtainEscapeParamString = function (textState) {
+    const regExp = /^\[.*?\]/;
+    const arr = regExp.exec(textState.text.slice(textState.index));
+    if (arr) {
+        textState.index += arr[0].length;
+        return arr[0].slice(1, arr[0].length - 1);
+    } else {
+        return "";
+    }
+};
 
-    $.Window_Message_processEscapeCharacter = Window_Message.prototype.processEscapeCharacter;
-    Window_Message.prototype.processEscapeCharacter = function (code, textState) {
-        $.Window_Message_processEscapeCharacter.apply(this, arguments);
-        switch (code) {
-            case "SEN":
-                $gameMessage.textSe().name = $.obtainEscapeParamString(textState);
-                break;
-            case "SEF":
-                $gameMessage.textSe().frequency = this.obtainEscapeParam(textState);
-                break;
-            case "SEPA":
-                $gameMessage.textSe().pan = parseInt($.obtainEscapeParamString(textState));
-                break;
-            case "SEV":
-                $gameMessage.textSe().volume = this.obtainEscapeParam(textState);
-                break;
-            case "SEPIMAX":
-                $gameMessage.textSe().maxPitch = this.obtainEscapeParam(textState);
-                break;
-            case "SEPIMIN":
-                $gameMessage.textSe().minPitch = this.obtainEscapeParam(textState);
-                break;
-            case "SEPI":
-                const pitchParams = $.obtainEscapeParamString(textState).split(',');
-                const min = parseInt(pitchParams[0]);
-                const max = parseInt(pitchParams[1]);
-                $gameMessage.textSe().minPitch = min;
-                $gameMessage.textSe().maxPitch = max;
-                break;
-            case "SEPRE":
-                const /**@type {Text_Sound} */ preset = $.presets.get($.obtainEscapeParamString(textState));
-                if (preset) {
-                    $gameMessage._textSe = preset.clone();
-                }
-                break;
-        }
-    };
-
-})(KCDev.TextSounds);
+KCDev.TextSounds.Window_Message_processEscapeCharacter = Window_Message.prototype.processEscapeCharacter;
+Window_Message.prototype.processEscapeCharacter = function (code, textState) {
+    KCDev.TextSounds.Window_Message_processEscapeCharacter.apply(this, arguments);
+    switch (code) {
+        case "SEN":
+            $gameMessage.textSe().name = KCDev.TextSounds.obtainEscapeParamString(textState);
+            break;
+        case "SEF":
+            $gameMessage.textSe().frequency = this.obtainEscapeParam(textState);
+            break;
+        case "SEPA":
+            $gameMessage.textSe().pan = parseInt(KCDev.TextSounds.obtainEscapeParamString(textState));
+            break;
+        case "SEV":
+            $gameMessage.textSe().volume = this.obtainEscapeParam(textState);
+            break;
+        case "SEPIMAX":
+            $gameMessage.textSe().maxPitch = this.obtainEscapeParam(textState);
+            break;
+        case "SEPIMIN":
+            $gameMessage.textSe().minPitch = this.obtainEscapeParam(textState);
+            break;
+        case "SEPI":
+            const pitchParams = KCDev.TextSounds.obtainEscapeParamString(textState).split(',');
+            const min = parseInt(pitchParams[0]);
+            const max = parseInt(pitchParams[1]);
+            $gameMessage.textSe().minPitch = min;
+            $gameMessage.textSe().maxPitch = max;
+            break;
+        case "SEPRE":
+            const /**@type {KCDev.TextSounds.Text_Sound} */ preset = KCDev.TextSounds.presets.get(KCDev.TextSounds.obtainEscapeParamString(textState));
+            if (preset) {
+                $gameMessage._textSe = preset.clone();
+            }
+            break;
+    }
+};
