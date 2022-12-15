@@ -43,7 +43,7 @@
  * 
  *   v1.1.0 - 2022/12/15
  *     - Added \SEPLAY text code to immediately play the currently-loaded text
- *       sound
+ *       sound or a preset
  *     - Restructured code to be in-line with current internal
  *       coding practices
  *     - Plugin now always plays an SE on the first character if the
