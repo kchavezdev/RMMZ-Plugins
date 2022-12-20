@@ -1763,66 +1763,6 @@ Sprite_Character.prototype.updateReflectFloor = function () {
 };
 
 /**
- * Rebuilds and sets wall reflection cache for current map.
- */
-KCDev.Mirrors.refreshReflectWallCache = function () {
-    KCDev.Mirrors.reflectWallPositions = KCDev.Mirrors.buildCurrentMapCache();
-};
-
-/**
- * Returns the reflectable wall region map for the current game map
- * For performance, we pre-compute the closest wall region for every tile on the map
- * @returns {Map<number, number[]}
- */
-KCDev.Mirrors.buildCurrentMapCache = function () {
-    const /** @type {Map<number, number[]} */ regionMap = new Map();
-
-    for (let i = $gameMap.width() - 1; i >= 0; i--) {
-        for (let j = $gameMap.height() - 1; j >= 0; j--) {
-            const regionId = $gameMap.regionId(i, j);
-
-            if (KCDev.Mirrors.wallRegions.has(regionId)) {
-                let yArr = regionMap.get(i);
-
-                if (!yArr) {
-                    yArr = [];
-                }
-
-                yArr.push(j);
-
-                regionMap.set(i, yArr);
-            }
-        }
-    }
-
-    return regionMap;
-};
-
-/**
- * Gets the y coordinate of the closest tile with a wall reflection region that is above point (x,y)
- * Returns -1 if no valid wall region found
- * @param {number} x 
- * @param {number} y 
- */
-KCDev.Mirrors.getWallY = function (x, y) {
-    const mapId = $gameMap.mapId();
-
-    if (KCDev.Mirrors.currMapId !== mapId) {
-        KCDev.Mirrors.refreshReflectWallCache();
-        KCDev.Mirrors.currMapId = mapId;
-    }
-
-    const col = KCDev.Mirrors.reflectWallPositions.get(x);
-    if (col) {
-        const yArr = col.filter(yCoord => yCoord <= y);
-        return yArr.length > 0 ? yArr[0] : -1;
-    }
-    else {
-        return -1;
-    }
-};
-
-/**
  * New method: Sprite_Character.prototype.updateReflectWall
  * Updates the wall sprite's reflection's position, visibility, and scale for this character sprite
  */
@@ -1894,6 +1834,66 @@ Sprite_Character.prototype.updateReflectCommon = function (r) {
     r.setBlendColor(this.getBlendColor());
     r.setColorTone(this.getColorTone());
     r.blendMode = this.blendMode;
+};
+
+/**
+ * Rebuilds and sets wall reflection cache for current map.
+ */
+KCDev.Mirrors.refreshReflectWallCache = function () {
+    KCDev.Mirrors.reflectWallPositions = KCDev.Mirrors.buildCurrentMapCache();
+};
+
+/**
+ * Returns the reflectable wall region map for the current game map
+ * For performance, we pre-compute the closest wall region for every tile on the map
+ * @returns {Map<number, number[]}
+ */
+KCDev.Mirrors.buildCurrentMapCache = function () {
+    const /** @type {Map<number, number[]} */ regionMap = new Map();
+
+    for (let i = $gameMap.width() - 1; i >= 0; i--) {
+        for (let j = $gameMap.height() - 1; j >= 0; j--) {
+            const regionId = $gameMap.regionId(i, j);
+
+            if (KCDev.Mirrors.wallRegions.has(regionId)) {
+                let yArr = regionMap.get(i);
+
+                if (!yArr) {
+                    yArr = [];
+                }
+
+                yArr.push(j);
+
+                regionMap.set(i, yArr);
+            }
+        }
+    }
+
+    return regionMap;
+};
+
+/**
+ * Gets the y coordinate of the closest tile with a wall reflection region that is above point (x,y)
+ * Returns -1 if no valid wall region found
+ * @param {number} x 
+ * @param {number} y 
+ */
+KCDev.Mirrors.getWallY = function (x, y) {
+    const mapId = $gameMap.mapId();
+
+    if (KCDev.Mirrors.currMapId !== mapId) {
+        KCDev.Mirrors.refreshReflectWallCache();
+        KCDev.Mirrors.currMapId = mapId;
+    }
+
+    const col = KCDev.Mirrors.reflectWallPositions.get(x);
+    if (col) {
+        const yArr = col.filter(yCoord => yCoord <= y);
+        return yArr.length > 0 ? yArr[0] : -1;
+    }
+    else {
+        return -1;
+    }
 };
 
 /**
