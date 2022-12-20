@@ -31,14 +31,17 @@ SOFTWARE.
  * @base PluginCommonBase
  * @orderafter PluginCommonBase
  *
- * @plugindesc [v1.3.1]Add reflections to events and actors.
+ * @plugindesc [v1.3.2]Add reflections to events and actors.
  *
  * @help
  * KC_Mirrors.js
  * 
  * Changelog: 
-       v1.3.1 - 2022/10/26
-	       - Quick fix to CharReflections Filter Controller target
+ *     v1.3.2 - 2022/12/20
+ *         - Fixed bugs where incorrect scaling on the x axis would be applied
+ *           to reflections of events using tileset sprites
+ *      v1.3.1 - 2022/10/26
+ *	       - Quick fix to CharReflections Filter Controller target
  *     v1.3.0 - 2022/10/26
  *         - Added FilterControllerMZ targets
  *           | CharReflectionsFloor - Applies filter to all floor reflections
@@ -1718,6 +1721,7 @@ Sprite_Character.prototype.updateReflectionSprite = function () {
         this._reflectionFloor.bitmap = new Bitmap();
         this._reflectionWall.bitmap = new Bitmap();
         this._character.requestReflectRefresh();
+        //const parent = .
         SceneManager._scene._spriteset._tilemap.addChild(this._reflectionFloor);
         SceneManager._scene._spriteset._tilemap.addChild(this._reflectionWall);
     }
@@ -1748,7 +1752,7 @@ Sprite_Character.prototype.updateReflectFloor = function () {
         this.updateReflectCommon(r);
         // need to add portion of tile height for compatibility with KC_MoveRouteTF
         r.y = this.y + ((this.pivot.y) ? r.patternHeight() * this.scale.y : 0);
-        r.angle = -this.angle + 180;
+        r.angle = this.angle + 180;
         r.scale.x = -this.scale.x;
         r.scale.y = this.scale.y;
         r.y += char.jumpHeight() * 1.25;
@@ -1824,7 +1828,7 @@ KCDev.Mirrors.getWallY = function (x, y) {
  */
 Sprite_Character.prototype.updateReflectWall = function () {
 
-    const r = this._reflectionWall;
+    const /**@type {KCDev.Mirrors.Sprite_Reflect_Wall} */ r = this._reflectionWall;
 
     const char = this._character;
     const charX = this._character.x;
@@ -1846,6 +1850,9 @@ Sprite_Character.prototype.updateReflectWall = function () {
 
             const tileH = $gameMap.tileHeight();
 
+            r.scale.x = (r._tileId ? this.scale.x : -this.scale.x);
+            r.scale.y = this.scale.y;
+
             if (isPerspectiveMode) {
                 r.y = this.y - tileH * distToWall - distToWall;
 
@@ -1857,16 +1864,13 @@ Sprite_Character.prototype.updateReflectWall = function () {
                     scale = 0;
                 }
 
-                r.scale.x = -this.scale.x * scale;
-                r.scale.y = this.scale.y * scale;
+                r.scale.x *= scale;
+                r.scale.y *= scale;
                 r.y -= char.jumpHeight() * scale * 0.1;
                 r.y -= r.pivot.y * (1 - scale);
             }
             else {
                 r.y = this.y - tileH * distToWall * 2 + tileH;
-
-                r.scale.x = this.scale.x * -1;
-                r.scale.y = this.scale.y;
                 r.y -= char.jumpHeight();
             }
             r.x += ($gameMap.reflectWallXOffset() + char.reflectWallXOffset());
@@ -1923,7 +1927,6 @@ KCDev.Mirrors.handleReflectFrame = function (r) {
     if (this._tileId > 0 && this._characterName === r._characterName) {
         r._tileId = this._tileId;
         r.bitmap = this.bitmap;
-        r.scale.x = Math.abs(r.scale.x);
         r.updateTileFrame();
     }
     else {
@@ -2016,9 +2019,9 @@ if (window.Filter_Controller) {
         const targets = [];
         if (this._spriteset) {
             if (this._spriteset._characterSprites) {
-                this._spriteset._characterSprites.forEach(sprite => {targets.push(sprite._reflectionWall); targets.push(sprite._reflectionFloor)});
+                this._spriteset._characterSprites.forEach(sprite => { targets.push(sprite._reflectionWall); targets.push(sprite._reflectionFloor) });
             }
-            
+
         }
         return targets;
     };
