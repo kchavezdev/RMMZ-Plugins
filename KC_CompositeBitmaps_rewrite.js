@@ -65,15 +65,49 @@
  * 
  * @command addComposites
  * @text Create Multiple Composites
- * @desc Set up many composite bitmaps in a single, convenient plugin command!
+ * @desc Bulk version of the Create Composite command.
  * 
  * @arg compositeBmps
  * @text Composite Bitmaps
  * @type struct<CompositeBitmap>[]
  * 
  * @command editComposite
+ * @text Edit Composite Layer
+ * @desc Replace a layer of a composite bitmap.
+ * 
+ * @arg newLayer
+ * @text Edit Properties
+ * @type struct<LayerReplace>
+ * 
+ * @command editComposites
+ * @text Edit Multiple Composite Layers
+ * @desc Bulk operation of the Edit Composite Layer command.
+ * 
+ * @arg Edits to Make
+ * @type struct<LayerReplace>[]
  * 
 */
+
+/*~struct~LayerReplace:
+ * @param url
+ * @text Bitmap Path
+ * @desc The url of the composite bitmap that is being edited. Nothing happens if this bitmap isn't a composite.
+ * @type file
+ * @dir img/
+ * 
+ * @param index
+ * @text Index
+ * @desc Choose the index of the layer to edit.
+ * @type combo
+ * @option add_bottom_layer
+ * @option add_top_layer
+ * 
+ * @param newLayer
+ * @text Replacement Layer
+ * @desc The layer you wish to replace the one at the specified index with.
+ * @type struct<Layer>
+ * 
+ */
 
 /*~struct~constant:
  * @param varId
