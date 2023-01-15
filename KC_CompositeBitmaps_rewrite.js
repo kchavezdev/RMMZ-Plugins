@@ -64,24 +64,24 @@
  * @type struct<CompositeBitmap>
  * 
  * @command addComposites
- * @text Create Multiple Composites
- * @desc Bulk version of the Create Composite command.
+ * @text Batch Create Composites
+ * @desc Create multiple composite bitmaps in a single command.
  * 
  * @arg compositeBmps
  * @text Composite Bitmaps
  * @type struct<CompositeBitmap>[]
  * 
- * @command editComposite
- * @text Edit Composite Layer
+ * @command replaceComposite
+ * @text Replace Composite Layer
  * @desc Replace a layer of a composite bitmap.
  * 
  * @arg newLayer
  * @text Edit Properties
  * @type struct<LayerReplace>
  * 
- * @command editComposites
- * @text Edit Multiple Composite Layers
- * @desc Bulk operation of the Edit Composite Layer command.
+ * @command replaceComposites
+ * @text Batch Replace Composite Layers
+ * @desc Replace multiple composite layers in a single command.
  * 
  * @arg Edits to Make
  * @type struct<LayerReplace>[]
@@ -505,10 +505,7 @@ KCDev.CompositeBitmaps.getShiftedBitmap = function (bitmap, x, y) {
     const width = bitmap.width;
     const height = bitmap.height;
     const finalBitmap = new Bitmap(width, height);
-    // if the image is shifted more than the dimensions, the bitmap will be blank so don't bother copying.
-    if (Math.abs(x) < bitmap.width && Math.abs(y) < bitmap.height) {
-        finalBitmap.blt(bitmap, -x, -y, width, height, 0, 0);
-    }
+    finalBitmap.context.translate(x, y);
     return finalBitmap;
 };
 
@@ -678,6 +675,7 @@ KCDev.CompositeBitmaps.Composite_Bitmap = class Composite_Bitmap extends Bitmap 
                         break;
                 }
             }
+            bitmap._baseTexture.update();
         }
         KCDev.CompositeBitmaps.drawBitmapGridEntry(bitmap, this, info.destinationIndex, this._numCols, this._numRows, false);
     }
@@ -723,6 +721,7 @@ KCDev.CompositeBitmaps.Composite_Bitmap = class Composite_Bitmap extends Bitmap 
 KCDev.CompositeBitmaps.Composite_Manager = class Composite_Manager {
     constructor() {
         this.init();
+        this.clear = this.init; // for now, just make clear an alias of init
     }
 
     init() {
@@ -732,6 +731,8 @@ KCDev.CompositeBitmaps.Composite_Manager = class Composite_Manager {
         /**@type {Map<string,Set<string>>} */ this._dependencies = new Map();
 
     }
+
+    clear() {}
 
     /**
      * 
@@ -945,7 +946,7 @@ KCDev.CompositeBitmaps.Composite_Manager = class Composite_Manager {
 
 KCDev.CompositeBitmaps.manager = new KCDev.CompositeBitmaps.Composite_Manager();
 
-/*
+
 // start new game
 KCDev.CompositeBitmaps.DataManager_createGameObjects = DataManager.createGameObjects;
 DataManager.createGameObjects = function () {
@@ -953,6 +954,7 @@ DataManager.createGameObjects = function () {
     KCDev.CompositeBitmaps.manager.clear();
 };
 
+/*
 // save game
 KCDev.CompositeBitmaps.DataManager_makeSaveContents = DataManager.makeSaveContents;
 DataManager.makeSaveContents = function () {
