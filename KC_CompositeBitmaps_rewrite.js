@@ -26,6 +26,8 @@
  * @author K. Chavez 
  * @url https://github.com/kchavezdev/RMMZ-Plugins
  * @target MZ
+ * @base PluginCommonBase
+ * @orderafter PluginCommonBase
  *
  * @plugindesc [v2.0]Combine graphics to create layered bitmaps.
  *
