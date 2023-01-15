@@ -509,20 +509,24 @@ KCDev.CompositeBitmaps.getShiftedBitmap = function (bitmap, x, y) {
     return finalBitmap;
 };
 
+KCDev.CompositeBitmaps.extras = {};
+KCDev.CompositeBitmaps.extras.svFrameShifts = {};
+KCDev.CompositeBitmaps.extras.svFrameShifts.offsets = {};
+
 /**
  * Takes an offset mapping and reverses it
  * @param {number[][]} offsets 
  * @returns {number[][]}
  */
-KCDev.CompositeBitmaps.flipOffsets = function (offsets) {
+KCDev.CompositeBitmaps.extras.svFrameShifts.flipOffsets = function (offsets) {
     return offsets.map(pair => {
         return pair.map(offset => {
             return offset * -1;
         })
     });
-}
+};
 
-KCDev.CompositeBitmaps.MZF_TO_MZM_OFFSETS = [
+KCDev.CompositeBitmaps.extras.svFrameShifts.offsets.MZF_2_MZM = [
     [0, 0], [0, 0], [0, 0], [0, 0], [1, 0], [1, 0], [3, -2], [3, -2], [3, -2],
     [1, 0], [1, 0], [1, 0], [0, 0], [1, 0], [1, 0], [0, 0], [0, 0], [0, 0],
     [0, 0], [0, 0], [0, 0], [0, 0], [0, 0], [0, 0], [-1, -2], [-1, -2], [-1, -2],
@@ -531,7 +535,7 @@ KCDev.CompositeBitmaps.MZF_TO_MZM_OFFSETS = [
     [0, 1], [0, 1], [0, 1], [0, 0], [0, 0], [0, 0], [0, 0], [0, 0], [0, 0]
 ];
 
-KCDev.CompositeBitmaps.MZM_TO_MZF_OFFSETS = KCDev.CompositeBitmaps.flipOffsets(KCDev.CompositeBitmaps.MZF_TO_MZM_OFFSETS);
+KCDev.CompositeBitmaps.extras.svFrameShifts.offsets.MZM_2_MZF = KCDev.CompositeBitmaps.extras.svFrameShifts.flipOffsets(KCDev.CompositeBitmaps.extras.svFrameShifts.offsets.MZF_2_MZM);
 
 /**
  * @typedef {Object} KCDev.CompositeBitmaps.Composite_Bitmap.OptionalInfo
