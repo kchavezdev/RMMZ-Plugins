@@ -1,7 +1,7 @@
 /**
  * MIT License
  * 
- * Copyright (c) 2022 K. Chavez <kchavez.dev@gmail.com>
+ * Copyright (c) 2022-2023 K. Chavez <kchavez.dev@gmail.com>
  * 
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -414,15 +414,18 @@ KCDev.CompositeBitmaps.currentVersion = "2.0";
  */
 
 /**
+ * @typedef {number[]} KCDev.CompositeBitmaps.Coordinates
+ */
+
+/**
  * @typedef {Object} KCDev.CompositeBitmaps.Layer_Info
  * @property {string} source
- * @property {string} sourceFolder
  * @property {number} sourceIndex
  * @property {number} sourceRowNum
  * @property {number} sourceColNum
  * @property {number} destinationIndex
- * @property {number[]} globalShift
- * @property {number[][]} frameShifts
+ * @property {KCDev.CompositeBitmaps.Coordinates} globalShift
+ * @property {KCDev.CompositeBitmaps.Coordinates[]} frameShifts
  * @property {number} frameHeight
  * @property {number} frameWidth
  * @property {KCDev.CompositeBitmaps.PluginStructs.AdvancedLayerTransforms} layerTf
@@ -442,7 +445,7 @@ KCDev.CompositeBitmaps.currentVersion = "2.0";
  * @param {number} dh
  * @param {string} compOp
  */
-KCDev.CompositeBitmaps.bltExtended = function(source, sx, sy, sw, sh, destination, dx, dy, dw, dh, compOp = 'source-over') {
+KCDev.CompositeBitmaps.bltExtended = function (source, sx, sy, sw, sh, destination, dx, dy, dw, dh, compOp = 'source-over') {
     dw = dw || sw;
     dh = dh || sh;
     try {
@@ -492,8 +495,8 @@ KCDev.CompositeBitmaps.drawBitmapGridEntry = function (source, destination, dest
     if (clearOld) {
         destination.clearRect(dx, dy, width, height);
     }
-    
-    this.bltExtended(source, 0, 0, source.width, source.height, destination, dx, dy, width, height, compOp);
+
+    KCDev.CompositeBitmaps.bltExtended(source, 0, 0, source.width, source.height, destination, dx, dy, width, height, compOp);
     return destination;
 };
 
@@ -589,7 +592,7 @@ KCDev.CompositeBitmaps.Composite_Bitmap = class Composite_Bitmap extends Bitmap 
         }
 
         this._layerInfos.forEach(info => {
-            ImageManager.loadBitmap(info.sourceFolder, info.source).addLoadListener(bmp => {
+            ImageManager.loadBitmapFromUrl(info.source).addLoadListener(bmp => {
                 info.numCols = Math.floor(bmp.width / info.frameWidth);
                 info.numRows = Math.floor(bmp.height / info.frameHeight);
                 this._infoBitmaps.set(info, bmp);
@@ -675,7 +678,7 @@ KCDev.CompositeBitmaps.Composite_Bitmap = class Composite_Bitmap extends Bitmap 
                     case 'F':
                         bitmap.context.scale(tf.scaleX, tf.scaleY);
                         break;
-                
+
                     default:
                         //
                         break;
@@ -738,7 +741,7 @@ KCDev.CompositeBitmaps.Composite_Manager = class Composite_Manager {
 
     }
 
-    clear() {}
+    clear() { }
 
     /**
      * 
@@ -1090,20 +1093,24 @@ KCDev.CompositeBitmaps.easyWordReplace = function (str = '', startToken = '', en
  * @param {string} str 
  */
 KCDev.CompositeBitmaps.replaceControlCodes = function (str) {
-    return this.easyWordReplace(str, '\\v[', ']', $gameVariables.value);
+    return KCDev.CompositeBitmaps.easyWordReplace(str, '\\v[', ']', $gameVariables.value);
 };
 
 /**
  * 
  * @param {string} param 
  */
-KCDev.CompositeBitmaps.parseParameter = function (param) {
-    
-    const final = this.easyWordReplace(this.replaceControlCodes(param), '\\const[', ']', (input) => { return KCDev.CompositeBitmaps.UserVariables[input] || '' });
+KCDev.CompositeBitmaps.parseParameter = function (param, thisObj = null) {
+
+    if (typeof param !== 'string') {
+        return param;
+    }
+
+    const final = KCDev.CompositeBitmaps.easyWordReplace(KCDev.CompositeBitmaps.replaceControlCodes(param), '\\const[', ']', (input) => { return KCDev.CompositeBitmaps.UserVariables[input] || '' });
 
     try {
         // try to eval this first
-        return (new Function("use strict; return (" + final + ")"))();
+        return (new Function("use strict; return (" + final + ")")).call(thisObj);
     }
     catch (error) {
         // if the eval fails, assume it was a string
@@ -1114,26 +1121,32 @@ KCDev.CompositeBitmaps.parseParameter = function (param) {
 KCDev.CompositeBitmaps.parseAllParameters = function (obj) {
     for (const propName of Object.getOwnPropertyNames(obj)) {
         const prop = obj[propName];
-        if (typeof prop === 'string') {
+        if (Array.isArray(prop)) {
+            prop.forEach(entry => {
+                KCDev.CompositeBitmaps.parseAllParameters(entry);
+            });
+        }
+        else if (typeof prop === 'string') {
             try {
                 // need to do this in case parameter is actually an object with params of its own
-                obj[propName] = this.parseAllParameters(JsonEx.parse(prop));
+                obj[propName] = KCDev.CompositeBitmaps.parseAllParameters(JsonEx.parse(prop));
             } catch (error) {
-                obj[propName] = this.parseParameter(prop);
+                obj[propName] = KCDev.CompositeBitmaps.parseParameter(prop);
             }
         }
     }
     return obj;
 };
 
+/**@type {string} */
+KCDev.CompositeBitmaps.scriptName = document.currentScript.src.split("/").pop().replace(/\.js$/, "");
+
 // handle plugin parameters
 (() => {
 
-    const script = document.currentScript.src.split("/").pop().replace(/\.js$/, "");
-
-    const parameters = PluginManager.parameters(script);
-
     const $ = KCDev.CompositeBitmaps;
+
+    const parameters = PluginManager.parameters($.scriptName);
 
     function parseNoError(str) {
         try {
@@ -1159,3 +1172,38 @@ KCDev.CompositeBitmaps.parseAllParameters = function (obj) {
         });
     }
 })();
+
+KCDev.CompositeBitmaps.pluginCommands = {};
+
+/**
+ * 
+ * @param {KCDev.CompositeBitmaps.PluginStructs.CompositeBitmap} cmp 
+ */
+KCDev.CompositeBitmaps.pluginCommands.addComposite = function (cmp) {
+    /**@type {KCDev.CompositeBitmaps.Layer_Info[]} */ const layerInfos = [];
+
+    KCDev.CompositeBitmaps.parseAllParameters(cmp);
+
+    cmp.layers.forEach(layer => {
+
+        let srcIdx = 0;
+        let srcRowCount = 1;
+        let srcColCount = 1;
+
+        if (layer.useSrcGrid) {
+            
+        }
+
+        let dstIdx = 0;
+
+        if (layer.useDstGrid) {
+
+        }
+
+        layerInfos.push({
+            source: layer.sourceFile,
+            sourceIndex: srcIdx,
+
+        })
+    });
+};
