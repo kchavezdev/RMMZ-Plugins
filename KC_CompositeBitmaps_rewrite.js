@@ -181,11 +181,21 @@
  * @option AUTO
  * @default AUTO
  * 
- * @param srcTile
- * @text Tiled
- * @desc Enabling this will tile the layer over the entire composite image.
- * @type boolean
- * @default false
+ * @param tiling
+ * @text Tiling Options
+ * @desc Options regarding the tiling of this layer.
+ * 
+ * @param tileX
+ * @parent tiling
+ * @text Horizontal Tiles
+ * @desc Set the number of horizontal tiles. Setting this to 0 will tile across the layer.
+ * @default 1
+ * 
+ * @param tileY
+ * @parent tiling
+ * @text Vertical Tiles
+ * @desc Set the number of horizontal tiles. Setting this to 0 will tile across the layer.
+ * @default 1
  * 
  * @param src
  * @text Source
@@ -233,7 +243,7 @@
  * @param useDstGrid
  * @text Use Grid
  * @parent dst
- * @desc If enabled, this will cut out a piece of the destination image before applying any other operations.
+ * @desc If enabled, this will cause only a section of the composite to be edited.
  * @type boolean
  * @default false
  * 
@@ -308,7 +318,7 @@
  * @param frameWidth
  * @text Frame Width
  * @parent cols
- * @desc Auto calculate the number of columns based on a frame width.
+ * @desc Auto calculate the number of columns based on a frame width. Only used for auto_frame_width.
  * @type number
  * @default 1
  * @min 1
@@ -325,7 +335,7 @@
  * @param frameHeight
  * @text Frame Height
  * @parent rows
- * @desc Auto calculate the number of columns based on a frame height.
+ * @desc Auto calculate the number of columns based on a frame height. Only used for auto_frame_height.
  * @type number
  * @default 1
  * @min 1
@@ -542,60 +552,35 @@ KCDev.CompositeBitmaps.extras.svFrameShifts.offsets.MZF_2_MZM = [
 
 KCDev.CompositeBitmaps.extras.svFrameShifts.offsets.MZM_2_MZF = KCDev.CompositeBitmaps.extras.svFrameShifts.flipOffsets(KCDev.CompositeBitmaps.extras.svFrameShifts.offsets.MZF_2_MZM);
 
-/**
- * @typedef {Object} KCDev.CompositeBitmaps.Composite_Bitmap.OptionalInfo
- * @property {string} proxyUrl
- * @property {number} rows
- * @property {number} columns
- * @property {number} width
- * @property {number} height
- */
-
 // parent composite class that is the base for all composite bitmaps
 KCDev.CompositeBitmaps.Composite_Bitmap = class Composite_Bitmap extends Bitmap {
 
     /**
      * 
-     * @param {KCDev.CompositeBitmaps.Layer_Info[]} layerInfos 
-     * @param {KCDev.CompositeBitmaps.Composite_Bitmap.OptionalInfo} opts
+     * @param {KCDev.CompositeBitmaps.PluginStructs.CompositeBitmap} compositeInfo 
      */
-    constructor(layerInfos, opts = {}) {
+    constructor(compositeInfo) {
         super();
-        this._loadingState = 'loading';
-        /**@type {KCDev.CompositeBitmaps.Layer_Info[]} */ this._layerInfos = layerInfos;
-        /**@type {KCDev.CompositeBitmaps.Composite_Bitmap.OptionalInfo} */ this._optionalParams = opts;
+        /**@type {KCDev.CompositeBitmaps.PluginStructs.CompositeBitmap} */ this._compositeInfo = compositeInfo;
         this.refreshComposite();
     }
 
     refreshComposite() {
         this._destroyCanvas();
 
-        this._loadingState = 'loading'
+        this._loadingState = 'loading';
 
-        const opts = this._optionalParams;
+        /**@type {Map<KCDev.CompositeBitmaps.PluginStructs.Layer, Bitmap>} */ this._layerBitmaps = new Map();
 
-        /**@type {Map<KCDev.CompositeBitmaps.Layer_Info, Bitmap>} */ this._infoBitmaps = new Map();
+        this._numToLoad = this._compositeInfo.layers.length;
 
-        this._numRows = opts.rows || 1;
-        this._numCols = opts.columns || 1;
-        this._numToLoad = layerInfos.length;
-        if (opts.width || !opts.height) {
-            this._needsResolutionChange = true;
+        if (this._numToLoad === 0) {
+            this._loadingState = 'none';
         }
 
-        if (opts.proxyUrl && opts.proxyUrl !== '') {
-            this._numToLoad++;
-            this._proxyBitmap = ImageManager.loadBitmapFromUrl(opts.proxyUrl);
-            this._proxyBitmap.addLoadListener(() => {
-                this._loadCallback();
-            });
-        }
-
-        this._layerInfos.forEach(info => {
-            ImageManager.loadBitmapFromUrl(info.source).addLoadListener(bmp => {
-                info.numCols = Math.floor(bmp.width / info.frameWidth);
-                info.numRows = Math.floor(bmp.height / info.frameHeight);
-                this._infoBitmaps.set(info, bmp);
+        this._compositeInfo.layers.forEach(layer => {
+            ImageManager.loadBitmapFromUrl(layer.sourceFile).addLoadListener(bmp => {
+                this._layerBitmaps.set(layer, bmp);
                 this._loadCallback();
             });
         });
@@ -610,23 +595,8 @@ KCDev.CompositeBitmaps.Composite_Bitmap = class Composite_Bitmap extends Bitmap 
     }
 
     _onLoad() {
-        if (this._needsResolutionChange) {
-            if (this._proxyBitmap) {
-                this.height = this._proxyBitmap.height;
-                this.width = this._proxyBitmap.width;
-            }
-            else {
-                const bottom = this._infoBitmaps.get(this._layerInfos[0]) || new Bitmap();
-                this.height = bottom.height;
-                this.width = bottom.width;
-            }
-        }
 
-        this._layerInfos.forEach(layerInfo => {
-            this.handleLayerInfo(layerInfo);
-        });
 
-        delete this._infoBitmaps; // don't need this anymore
 
         this._loadingState = 'loaded';
     }
@@ -1072,10 +1042,11 @@ KCDev.CompositeBitmaps.easyWordReplace = function (str = '', startToken = '', en
         }
 
         if (end < 0) {
-            throw new Error('KCDev.CompositeBitmaps.easyWordReplace: No closing token \'' + endToken + '\'')
+            throw new Error('KCDev.CompositeBitmaps.easyWordReplace: No closing token \'' + endToken + '\'');
         }
 
-        const replaceArg = final.substring(start, end);
+        // Why did I allow them to put constants within constant identifiers? Hope you're enjoying all the recursion, whoever the heck reads this
+        const replaceArg = KCDev.CompositeBitmaps.easyWordReplace(final.substring(start, end), startToken, endToken, replacementGetter, caseSensitive, maxReplacements);
 
         const replacement = replacementGetter(replaceArg);
 
@@ -1184,26 +1155,5 @@ KCDev.CompositeBitmaps.pluginCommands.addComposite = function (cmp) {
 
     KCDev.CompositeBitmaps.parseAllParameters(cmp);
 
-    cmp.layers.forEach(layer => {
-
-        let srcIdx = 0;
-        let srcRowCount = 1;
-        let srcColCount = 1;
-
-        if (layer.useSrcGrid) {
-            
-        }
-
-        let dstIdx = 0;
-
-        if (layer.useDstGrid) {
-
-        }
-
-        layerInfos.push({
-            source: layer.sourceFile,
-            sourceIndex: srcIdx,
-
-        })
-    });
+    
 };
