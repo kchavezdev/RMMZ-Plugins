@@ -607,7 +607,7 @@ KCDev.SkipEvent.skipGauge.label = {
     PluginManagerEx.registerCommand(script, 'setMapCoordinate', function (args) {
         const x = args.x === '' ? undefined : args.x;
         const y = args.y === '' ? undefined : args.y;
-        KCDev.SkipEvent.setMapScrollPos(args.x, args.y);
+        KCDev.SkipEvent.setMapScrollPos(x, y);
     });
 
     PluginManagerEx.registerCommand(script, 'resetMapScroll', function (args) {
@@ -756,11 +756,16 @@ Game_Interpreter.prototype.startEventSkip = function () {
     }
     else {
         this._isSkipping = true;
+
+        // we need to wait to break out of the update loop correctly
+        this.wait(1);
+        
         if (this._skipFadeOut) {
             const fs = this.fadeSpeed();
             $gameScreen.startFadeOut(fs);
             this.wait(fs);
         }
+
         KCDev.SkipEvent.requestMessageClose();
     }
 };
