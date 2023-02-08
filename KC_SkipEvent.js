@@ -28,7 +28,7 @@
  * @target MZ
  * @base PluginCommonBase
  *
- * @plugindesc [v0.1]Allow certain events to be skipped.
+ * @plugindesc [v1.0]Allow certain events to be skipped.
  *
  * @help
  * KC_SkipEvent.js
@@ -36,7 +36,7 @@
  * ----------------------------------------------------------------------------
  * 
  * Changelog:
- *     v1.0.0 - TBA
+ *     v1.0.0 - 2023/02/08
  *       - Initial release
  * 
  * ----------------------------------------------------------------------------
@@ -559,7 +559,7 @@ KCDev.SkipEvent.skipGauge.label = {
     }
 
     $.defaults.button = paramDefaults.skipButton;
-    $.defaults.frameCount = parseInt(paramDefaults.frameCount) || 180;
+    $.defaults.frameCount = Number(paramDefaults.frameCount) || 180;
     $.defaults.commonEventInherit = paramDefaults.commonEventInherit;
     $.defaults.fadeOut = paramDefaults.fadeOut;
     $.defaults.fadeIn = paramDefaults.fadeIn;
@@ -575,24 +575,24 @@ KCDev.SkipEvent.skipGauge.label = {
     }
 
     $.button.imgName = params.skipButtonImg;
-    $.button.offsets.x = parseInt(params.skipButtonX) || 0;
-    $.button.offsets.y = parseInt(params.skipButtonY) || 0;
+    $.button.offsets.x = Number(params.skipButtonX) || 0;
+    $.button.offsets.y = Number(params.skipButtonY) || 0;
     $.button.alignedLeft = params.skipButtonSide === 'L';
 
     const bar = $.skipGauge;
-    bar.color1 = parseInt(params.progressBarCol1) || ColorManager.normalColor();
-    bar.color2 = parseInt(params.progressBarCol2) || ColorManager.normalColor();
+    bar.color1 = Number(params.progressBarCol1) || ColorManager.normalColor();
+    bar.color2 = Number(params.progressBarCol2) || ColorManager.normalColor();
     bar.anchor = params.progressBarPosition;
     bar.enabled = params.progressBarEnabled;
-    bar.height = parseInt(params.progressBarHeight) || 0;
-    bar.width = parseInt(params.progressBarWidth) || 0;
-    bar.offsets.x = parseInt(params.progressBarXOff) || 0;
-    bar.offsets.y = parseInt(params.progressBarYOff) || 0;
+    bar.height = Number(params.progressBarHeight) || 0;
+    bar.width = Number(params.progressBarWidth) || 0;
+    bar.offsets.x = Number(params.progressBarXOff) || 0;
+    bar.offsets.y = Number(params.progressBarYOff) || 0;
     bar.label.text = params.progressBarLabel;
-    bar.label.width = parseInt(params.progressBarLabelWidth) || 0;
-    bar.label.height = parseInt(params.progressBarLabelHeight) || 0;
-    bar.label.fontSize = parseInt(params.progressBarLabelFontSize) || 0;
-    bar.label.color = parseInt(params.progressBarLabelColor) || 0;
+    bar.label.width = Number(params.progressBarLabelWidth) || 0;
+    bar.label.height = Number(params.progressBarLabelHeight) || 0;
+    bar.label.fontSize = Number(params.progressBarLabelFontSize) || 0;
+    bar.label.color = Number(params.progressBarLabelColor) || 0;
 
     PluginManagerEx.registerCommand(script, 'setupSkipParams', function (args) {
         const label = (args.label || '') + ''; // must be string
@@ -698,7 +698,7 @@ KCDev.SkipEvent.getYoungestInterpreter = function (interpreter) {
 };
 
 Game_Interpreter.prototype.reloadMapEvent = function (eventId = 0) {
-    const argId = parseInt(eventId);
+    const argId = Number(eventId);
     if (isNaN(argId) || argId < 0) {
         console.error('KC_SkipEvent: Invalid argument passed to Game_Interpreter.prototype.reloadMapEvent: ' + eventId);
     }
@@ -817,7 +817,7 @@ Game_Interpreter.prototype.update = function () {
 
 KCDev.SkipEvent.Game_Interpreter_setupChild = Game_Interpreter.prototype.setupChild;
 Game_Interpreter.prototype.setupChild = function () {
-    const skippable = this.isEventSkippable();
+    const skippable = this.isEventSkippable(); // need to save this before child is set up since events with currently-executing children are not skippable
     KCDev.SkipEvent.Game_Interpreter_setupChild.apply(this, arguments);
     if (skippable && this._skipInheritEnabled) {
         this._childInterpreter._skipParentParams = ['', this._skipFadeOut, this._skipFadeIn, this._skipFrameCount, this._skipButton, this._skipInheritEnabled];
@@ -961,6 +961,9 @@ KCDev.SkipEvent.createSkipSprites = function (scene) {
     }
 };
 
+/**
+ * @param {Scene_Base} scene 
+ */
 KCDev.SkipEvent.updateSkipSprites = function (scene) {
     if (scene._skipEventButton) {
         const interpreter = $gameParty.inBattle() ? $gameTroop._interpreter : $gameMap._interpreter;
@@ -1044,10 +1047,6 @@ BattleManager.update = function () {
 
 KCDev.SkipEvent.Sprite_SkipGauge = class Sprite_SkipGauge extends Sprite_Gauge {
 
-    static get properties() {
-        return KCDev.SkipEvent.skipGauge;
-    }
-
     initialize() {
         super.initialize();
     }
@@ -1081,11 +1080,11 @@ KCDev.SkipEvent.Sprite_SkipGauge = class Sprite_SkipGauge extends Sprite_Gauge {
     }
 
     bitmapWidth() {
-        return Sprite_SkipGauge.properties.width;
+        return KCDev.SkipEvent.skipGauge.width;
     }
 
     bitmapHeight() {
-        return Sprite_SkipGauge.properties.height;
+        return KCDev.SkipEvent.skipGauge.height;
     }
 
     gaugeHeight() {
@@ -1097,11 +1096,11 @@ KCDev.SkipEvent.Sprite_SkipGauge = class Sprite_SkipGauge extends Sprite_Gauge {
     }
 
     gaugeColor1() {
-        return ColorManager.textColor(Sprite_SkipGauge.properties.color1);
+        return ColorManager.textColor(KCDev.SkipEvent.skipGauge.color1);
     }
 
     gaugeColor2() {
-        return ColorManager.textColor(Sprite_SkipGauge.properties.color2);
+        return ColorManager.textColor(KCDev.SkipEvent.skipGauge.color2);
     }
 
     drawValue() {
