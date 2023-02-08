@@ -129,6 +129,10 @@
  *     - This command disables skipping the current event. Does nothing if
  *       the current event does not have a skip currently set up.
  * 
+ *   | Force Event Skip
+ *     - This command forces the currently setup skip to occur. Nothing
+ *       happens in-game if the current event was not skippable.
+ * 
  *   | Restore Parent Skip
  *     - This can be used inside of a common event if Disable Event Skip was
  *       used inside of it to restore the ability of the common event to end
@@ -371,6 +375,10 @@
  * @text Disable Event Skip
  * @desc Disable skipping for the current event.
  * 
+ * @command forceSkip
+ * @text Force Event Skip
+ * @desc Force an event skip.
+ * 
  * @command restoreParentParams
  * @text Restore Parent Skip
  * @desc Restores the skip parameters of the parent event. Basically only used if you call a Common Event from an event.
@@ -588,7 +596,7 @@ KCDev.SkipEvent.skipGauge.label = {
 
     PluginManagerEx.registerCommand(script, 'setupSkipParams', function (args) {
         const label = (args.label || '') + ''; // must be string
-        const overrides = (typeof args.overrides === 'object') ? args.overrides : {}; // just in case undefined or null is passed in as an argument for some unholy reason
+        const overrides = args.overrides || {}; // just in case undefined or null is passed in as an argument for some unholy reason
         this.setupSkip(label, overrides.fadeOut, overrides.fadeIn, overrides.frameCount, overrides.skipButton, overrides.commonEventInherit);
     });
 
@@ -612,6 +620,16 @@ KCDev.SkipEvent.skipGauge.label = {
 
     PluginManagerEx.registerCommand(script, 'resetMapScroll', function (args) {
         KCDev.SkipEvent.resetMapScroll();
+    });
+
+    PluginManagerEx.registerCommand(script, 'forceSkip', function (args) {
+        if (this.isEventSkippable()) {
+            KCDev.SkipEvent.requestSkip();
+            this.wait(1); // break out of the event update loop
+        }
+        else {
+            console.error('KC_SkipEvent: Tried to force event skip with plugin command, but no skip was set up!');
+        }
     });
 })();
 
@@ -757,7 +775,7 @@ Game_Interpreter.prototype.startEventSkip = function () {
     else {
         this._isSkipping = true;
 
-        // we need to wait to break out of the update loop correctly
+        // we need to wait to ensure certain commands aren't skipped
         this.wait(1);
         
         if (this._skipFadeOut) {
