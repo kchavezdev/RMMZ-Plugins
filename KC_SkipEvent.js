@@ -45,8 +45,8 @@
  * interrupting an event while it is running and skipping to a label defined in
  * the plugin command that sets up the skip's properties. Optionally, the
  * screen can be faded out right before the skip begins and, also optionally,
- * faded back in when the skip ends. Additionally, this plugin can place a skip
- * button that when clicked or touched will skip the scene.
+ * faded back in when the skip ends. Additionally, this plugin can place a
+ * clickable/touchable button on the screen that can also skip the event.
  * 
  * This plugin does NOT automatically run through the skipped commands since
  * certain commands, particularly move routes, can get quite complex when
@@ -85,6 +85,9 @@
  *         : Enabling this will fade the screen back in after the skip is over
  *           without the developer needing to explicitly call the Fadein Screen
  *           comand in the editor.
+ *       * Result Switch ID
+ *         : Setting this will set the passed in switch to false and flip it
+ *           to true if the cutscene is skipped.
  *       * Common Event Inherit
  *         : Enabling this will allow the skip's parameters to be passed into
  *           any common events called while this skip is active. This feature
@@ -178,12 +181,14 @@
  *       of move routes.
  * 
  *   | this.setupSkip(label: string, fadeIn?: boolean, fadeOut?: boolean,
- *                    button?: string, allowInherit: boolean)
+ *                    button?: string, resultSwitchId?: number,
+ *                    allowInherit: boolean)
  *     * label: Name of the label that will be jumped to if the player
  *              activates this event skip.
  *     * fadeIn: Plugin parameter fade in override. Optional.
  *     * fadeOut: Plugin parameter fade out override. Optional.
  *     * button: Plugin parameter button override. Optional.
+ *     * resultSwitchId: Plugin parameter result switch override. Optional.
  *     * allowInherit: Plugin parameter Common Event Inherit override.
  *                     Optional.
  *     - Sets up a skip. Any arguments left undefined will use the ones
@@ -212,7 +217,7 @@
  * @text Default Skip Settings
  * @desc Default parameters set when skipping event.
  * @type struct<SkipSettings>
- * @default {"skipButton":"pagedown","frameCount":"60","fadeOut":"true","fadeIn":"false","commonEventInherit":"false"}
+ * @default {"skipButton":"pagedown","frameCount":"60","fadeOut":"true","fadeIn":"false","resultSwitchId":"0","commonEventInherit":"false"}
  * 
  * @param useSkipButton
  * @text Use Skip Touch UI Button
@@ -439,6 +444,12 @@
  * @type boolean
  * @default false
  * 
+ * @param resultSwitchId
+ * @text Result Switch ID
+ * @desc Choose the ID of the switch to store the result of whether the event was skipped to.
+ * @type switch
+ * @default 0
+ * 
  * @param commonEventInherit
  * @text Common Event Inherit
  * @desc (EXPERIMENTAL) Allows Common Events to be ended early if the calling event's skip settings are met.
@@ -489,6 +500,13 @@
  * @option escape
  * @default pluginParam
  * 
+ * @param resultSwitchId
+ * @text Result Switch ID
+ * @desc Choose the ID of the switch to store the result of whether the event was skipped to.
+ * @type combo
+ * @option pluginParam
+ * @default pluginParam
+ * 
  * @param commonEventInherit
  * @text Common Event Inherit
  * @desc (EXPERIMENTAL) Allows Common Events to be ended early if the calling event's skip settings are met.
@@ -520,6 +538,7 @@ KCDev.SkipEvent.defaults.frameCount = 1;
 KCDev.SkipEvent.defaults.button = '';
 KCDev.SkipEvent.defaults.fadeOut = false;
 KCDev.SkipEvent.defaults.fadeIn = false;
+KCDev.SkipEvent.defaults.resultSwitchId = 0;
 KCDev.SkipEvent.globalWaitCounter = 0;
 KCDev.SkipEvent.skipGauge = {};
 KCDev.SkipEvent.skipGauge.color1 = 0;
@@ -551,7 +570,8 @@ KCDev.SkipEvent.skipGauge.label = {
         frameCount: 180,
         commonEventInherit: false,
         fadeOut: false,
-        fadeIn: false
+        fadeIn: false,
+        resultSwitchId: 0
     };
 
     if (params.defaults === '') {
@@ -563,6 +583,7 @@ KCDev.SkipEvent.skipGauge.label = {
     $.defaults.commonEventInherit = paramDefaults.commonEventInherit;
     $.defaults.fadeOut = paramDefaults.fadeOut;
     $.defaults.fadeIn = paramDefaults.fadeIn;
+    $.defaults.resultSwitchId = Number(paramDefaults.resultSwitchId) || 0;
     if (params.useSkipButton === 'systemSetting') {
         Object.defineProperty($.button, 'enabled', {
             get() {
@@ -597,7 +618,7 @@ KCDev.SkipEvent.skipGauge.label = {
     PluginManagerEx.registerCommand(script, 'setupSkipParams', function (args) {
         const label = (args.label || '') + ''; // must be string
         const overrides = args.overrides || {}; // just in case undefined or null is passed in as an argument for some unholy reason
-        this.setupSkip(label, overrides.fadeOut, overrides.fadeIn, overrides.frameCount, overrides.skipButton, overrides.commonEventInherit);
+        this.setupSkip(label, overrides.fadeOut, overrides.fadeIn, overrides.frameCount, overrides.skipButton, overrides.resultSwitchId, overrides.commonEventInherit);
     });
 
     PluginManagerEx.registerCommand(script, 'disableSkip', function (args) {
@@ -708,7 +729,7 @@ Game_Interpreter.prototype.reloadMapEvent = function (eventId = 0) {
     }
 };
 
-Game_Interpreter.prototype.setupSkip = function (labelName = '', fadeOut = 'pluginParam', fadeIn = 'pluginParam', frameCount = 'pluginParam', button = 'pluginParam', allowInherit = 'pluginParam') {
+Game_Interpreter.prototype.setupSkip = function (labelName = '', fadeOut = 'pluginParam', fadeIn = 'pluginParam', frameCount = 'pluginParam', button = 'pluginParam', resultSwitchId = 'pluginParam', allowInherit = 'pluginParam') {
     if (KCDev.SkipEvent.labelExists(this, labelName) || this._skipParentEnabled) {
         const param = 'pluginParam';
         const defaults = KCDev.SkipEvent.defaults;
@@ -718,6 +739,8 @@ Game_Interpreter.prototype.setupSkip = function (labelName = '', fadeOut = 'plug
         this._skipFadeIn = fadeIn === param ? defaults.fadeIn : fadeIn;
         this._skipFrameCount = frameCount === param || isNaN(frameCount) || frameCount < 1 ? defaults.frameCount : frameCount;
         this._skipButton = button === param ? defaults.button : button;
+        this._skipResultSwitchId = resultSwitchId === param ? defaults.resultSwitchId : (Number(resultSwitchId) || 0);
+        $gameSwitches.setValue(this._skipResultSwitchId, false);
         this._skipInheritEnabled = allowInherit === param ? defaults.commonEventInherit : allowInherit;
 
         this._skipParentEnabled = false;
@@ -800,7 +823,7 @@ Game_Interpreter.prototype.endSkip = function () {
     this._wasSkipped = true;
     this._isSkipping = false;
     this._skipLabel = '';
-
+    $gameSwitches.setValue(this._skipResultSwitchId, true);
 };
 
 KCDev.SkipEvent.Game_Interpreter_update = Game_Interpreter.prototype.update;
@@ -833,6 +856,7 @@ Game_Interpreter.prototype.restoreSkipParentParams = function () {
         c._skipFadeIn = p[2];
         c._skipFrameCount = p[3];
         c._skipButton = p[4];
+        c._skipResultSwitchId = 0;
         c._skipInheritEnabled = p[5];
         c._skipParentEnabled = true;
     }
