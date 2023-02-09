@@ -124,7 +124,7 @@
  *       exist, the skip setup process will be aborted, and an error will be
  *       printed in the developer console.
  *     - If no overrides are set, the parameters in the plugin commands will
- *       be used. Otherwise, each parameter can be overriden and will be
+ *       be used. Otherwise, each parameter can be overridden and will be
  *       active for this skip only. Any skips set up after this one will NOT
  *       inherit these overrides.
  *     
@@ -162,7 +162,7 @@
  * 
  *   | Reset Map Camera
  *     - This is basically a wrapper for 'Set Camera Coordinates' that
- *       sets x and y to the player's x and y coordinates, respectfully.
+ *       sets x and y to the player's x and y coordinates, respectively.
  * 
  * ----------------------------------------------------------------------------
  * 
@@ -182,7 +182,7 @@
  * 
  *   | this.setupSkip(label: string, fadeIn?: boolean, fadeOut?: boolean,
  *                    button?: string, resultSwitchId?: number,
- *                    allowInherit: boolean)
+ *                    allowInherit?: boolean)
  *     * label: Name of the label that will be jumped to if the player
  *              activates this event skip.
  *     * fadeIn: Plugin parameter fade in override. Optional.
