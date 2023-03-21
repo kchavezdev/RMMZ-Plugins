@@ -34,7 +34,7 @@
  * KC_SelfSwitchUtil.js
  * 
  * Changelog:
- *   v1.0.0 - YYYY/MM/DD
+ *   v1.0.0 - 2023/03/20
  *     - Initial release
  * 
  * Place this plugin under PluginCommonBase to get access to the following
