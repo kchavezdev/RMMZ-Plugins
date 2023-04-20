@@ -39,7 +39,7 @@
  * @base PluginBaseFunction
  * @orderafter PluginBaseFunction
  *
- * @plugindesc [v1.2]Combine graphics to create layered bitmaps.
+ * @plugindesc [v1.1.1]Combine graphics to create layered bitmaps.
  *
  * @help
  * KC_CompositeBitmaps.js
@@ -108,6 +108,19 @@
  * Save Graphic
  *      | Dump images (face/character/actor battler) to local computer storage
  *      | Also dumps current composite bitmap if proxy filename is used
+ * 
+ * Changelog:
+ *   v1.0.0 - 2022/08/08
+ *     - Initial release
+ *   v1.1.0 - 2022/08/13
+ *     - Added ability to clear layers with a new parameter in all add layer
+ *       plugin commands
+ *     - Fixed picture composite bitmap plugin parameters
+ *     - Updated help section to explicitly state variables are supported
+ *   v1.1.1 - 2023/04/19
+ *     - Mostly an internal code refactor
+ *     - Added workaround for Core Engine VisuStella MZ compatibility
+ *     - Internal cache is now cleared if ImageManager.clear is called
  * 
  * @param fixSaveScreen
  * @text Modify Save Screen
@@ -423,12 +436,14 @@ var KCDev = KCDev || {};
 // this plugin's namespace
 KCDev.CompositeBitmaps = {};
 
+KCDev.CompositeBitmaps.useImageCache = true;
+
 KCDev.CompositeBitmaps.faceLayers = {};
 KCDev.CompositeBitmaps.tvCharLayers = {};
 KCDev.CompositeBitmaps.svCharLayers = {};
 KCDev.CompositeBitmaps.picLayers = {};
 
-/**@type {Map<string, string>} */
+/**@type {Map<string, {bitmap: KCDev.CompositeBitmaps.Composite_Bitmap, config: string}>} */
 KCDev.CompositeBitmaps.cache = new Map();
 
 KCDev.CompositeBitmaps.script = document.currentScript;
@@ -506,6 +521,13 @@ KCDev.CompositeBitmaps.Composite_Bitmap = class Composite_Bitmap extends Bitmap 
         return new Bitmap();
     }
 };
+
+// COMPATIBILITY FIX - VisuMZ_0_CoreEngine
+// Disable YanFly sprite bitmap auto-purge on Composite Bitmaps if Core Engine VisuStella MZ is loaded
+// last confirmed working with version Core Engine version 1.75 on 2023/04/19
+if (!!window.Imported?.VisuMZ_0_CoreEngine) {
+    KCDev.CompositeBitmaps.Composite_Bitmap.prototype.markCoreEngineModified = function () {};
+}
 
 KCDev.CompositeBitmaps.Composite_Face_Bitmap = class Composite_Face_Bitmap extends KCDev.CompositeBitmaps.Composite_Bitmap {
     constructor(layerInfos) {
@@ -637,8 +659,7 @@ KCDev.CompositeBitmaps.Composite_Character_Bitmap = class Composite_Character_Bi
         const dw = (this._isBig) ? this.width : Math.floor(this.width / 4);
         const dh = (this._isBig) ? this.height : Math.floor(this.height / 2);
 
-        const firstLayerSet = Array(8);
-        firstLayerSet.fill(false);
+        const firstLayerSet = {};
 
         this._layerInfos.forEach(info => {
 
@@ -740,7 +761,7 @@ KCDev.CompositeBitmaps.setupComposite = function (filename, layerInfos, prefix, 
 
     filename = prefix + filename;
 
-    const /**@type {Map<string, string>} */ cache = KCDev.CompositeBitmaps.cache;
+    const cache = KCDev.CompositeBitmaps.cache;
 
     if (cache.has(filename)) {
         const cached = cache.get(filename);
@@ -758,7 +779,9 @@ KCDev.CompositeBitmaps.setupComposite = function (filename, layerInfos, prefix, 
 
     const compBmp = compositeLoadFunc(layerInfos);
 
-    cache.set(filename, { bitmap: compBmp, config: config });
+    if (KCDev.CompositeBitmaps.useImageCache) {
+        cache.set(filename, { bitmap: compBmp, config: config });
+    }
 
     return compBmp;
 };
@@ -1339,6 +1362,16 @@ ImageManager.loadPicture = function (filename) {
 
     return (layers) ? KCDev.CompositeBitmaps.setupComposite(filename, layers, KCDev.CompositeBitmaps.PICTURE_PREFIX, KCDev.CompositeBitmaps.Composite_Picture_Bitmap.load)
         : KCDev.CompositeBitmaps.ImageManager_loadPicture.apply(this, arguments);
+};
+
+KCDev.CompositeBitmaps.ImageManager_clear = ImageManager.clear;
+ImageManager.clear = function() {
+    KCDev.CompositeBitmaps.ImageManager_clear.apply(this, arguments);
+    const cache = KCDev.CompositeBitmaps.cache;
+    for (const url in cache) {
+        cache.get(url).bitmap.destroy();
+    }
+    KCDev.CompositeBitmaps.cache.clear();
 };
 
 (() => {
