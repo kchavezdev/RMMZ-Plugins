@@ -84,30 +84,34 @@
  * The plugin commands are as follows:
  *
  * Commands:
- *  Add Face Layers
+ *   Add Face Layers
  *      | Replaces a face file with a composite bitmap or adds new
  *      | layers onto an existing composite bitmap
- * Remove all Face Layers
+ *   Remove all Face Layers
  *      | Restore original face file
- * Add Top View Character Layers
+ *   Add Top View Character Layers
  *      | Replaces the character at a particular index in a TV character
  *      | file with a character built on a composite bitmap or adds onto
  *      | an existing composite bitmap
- * Remove All TV Character Layers
+ *   Remove All TV Character Layers
  *      | Restore top view character at an index to default appearance
- * Add SV Character Layers
+ *   Add SV Character Layers
  *      | Replace a side view actor image with a composite bitmap or add
  *      | onto an existing composite bitmap
- * Remove all SV Layers
+ *   Remove all SV Layers
  *      | Restore original side view actor image
- * Add Picture Layers
+ *   Add Picture Layers
  *      | Replace a picture with a composite bitmap or add onto an
  *      | existing composite bitmap
- * Remove all Picture Layers
+ *   Remove all Picture Layers
  *      | Restore original picture image
- * Save Graphic
+ *   Save Graphic
  *      | Dump images (face/character/actor battler) to local computer storage
  *      | Also dumps current composite bitmap if proxy filename is used
+ * 
+ * Compatability Notes:
+ *   - This plugin should be placed UNDER VisuMZ_0_CoreEngine in the plugin
+ *     manager
  * 
  * Changelog:
  *   v1.0.0 - 2022/08/08
@@ -119,7 +123,8 @@
  *     - Updated help section to explicitly state variables are supported
  *   v1.1.1 - 2023/04/19
  *     - Mostly an internal code refactor
- *     - Added workaround for Core Engine VisuStella MZ compatibility
+ *     - Fixed a conflict with VisuMZ_0_CoreEngine that caused cached bitmaps
+ *       to disappear
  *     - Internal cache is now cleared if ImageManager.clear is called
  * 
  * @param fixSaveScreen
@@ -523,7 +528,9 @@ KCDev.CompositeBitmaps.Composite_Bitmap = class Composite_Bitmap extends Bitmap 
 };
 
 // COMPATIBILITY FIX - VisuMZ_0_CoreEngine
-// Disable YanFly sprite bitmap auto-purge on Composite Bitmaps if Core Engine VisuStella MZ is loaded
+// NOTE: I AM UNAFFILIATED WITH THE VisuStella TEAM
+// Fix Description:
+// disable YanFly sprite bitmap auto-purge on Composite Bitmaps if Core Engine VisuStella MZ is loaded
 // last confirmed working with version Core Engine version 1.75 on 2023/04/19
 if (!!window.Imported?.VisuMZ_0_CoreEngine) {
     KCDev.CompositeBitmaps.Composite_Bitmap.prototype.markCoreEngineModified = function () {};
