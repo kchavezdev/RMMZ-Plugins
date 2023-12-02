@@ -37,7 +37,7 @@ SOFTWARE.
  * KC_Mirrors.js
  * 
  * Changelog: 
- *     v1.3.3 - 2022/12/20
+ *     v1.3.3 - 2022/12/1
  *         - Fixed a crash related to launching this plugin without
  *           FilterControllerMZ
  *     v1.3.2 - 2022/12/20
