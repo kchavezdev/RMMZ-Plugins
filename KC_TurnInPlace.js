@@ -114,7 +114,7 @@ KCDev.TurnInPlace.decrementTimers = function () {
  * @param {Game_Player} p 
  */
 KCDev.TurnInPlace.handleTimeUntilMoveSetup = function(p) {
-    if ($gameTemp.isDestinationValid() || KCDev.TurnInPlace.stoppingCooldownTimer > 0) {
+    if ((!KCDev.TurnInPlace.isAppliedWhenDashing && p.isDashing()) ||$gameTemp.isDestinationValid() || KCDev.TurnInPlace.stoppingCooldownTimer > 0) {
         KCDev.TurnInPlace.timeUntilMove = 0;
     }
     else if (p.getInputDirection() !== p.direction()) {
