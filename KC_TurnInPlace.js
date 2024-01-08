@@ -43,6 +43,12 @@
  * @default 6
  * @min 0
  * 
+ * @param delayDash
+ * @text Delay On Dash
+ * @desc Let player turn in place when dashing.
+ * @type boolean
+ * @default false
+ * 
  * @help
  * KC_TurnInPlace.js
  * 
