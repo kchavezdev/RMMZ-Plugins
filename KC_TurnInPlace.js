@@ -56,7 +56,7 @@
  * place when a directional button is pressed. This is an attempt to emulate
  * behavior seen in certain RPGs that use tile-based movement systems.
  * 
- * There are two configurable parameters.
+ * There are three configurable parameters.
  * 
  * | Delay Frames
  *   + This is the amount of frames the player will wait before the character
@@ -70,6 +70,11 @@
  *     is applied. This should be at least 2 if you want changing directions
  *     while walking to remain seamless.
  *   - Default: 6
+ * 
+ * | Delay On Dash
+ *   + If this is true, then the player will only turn in place while not
+ *     dashing.
+ *   - Default: False
  * 
  * Changelog:
  *   v1.0.0 - 2024.01.06
