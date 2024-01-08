@@ -112,13 +112,30 @@ KCDev.TurnInPlace.decrementTimers = function () {
 };
 
 /**
+ * 
+ * @param {Game_Player} p 
+ */
+KCDev.TurnInPlace.shouldMoveImmediately = function(p) {
+    return (!KCDev.TurnInPlace.isAppliedWhenDashing && p.isDashing()) ||$gameTemp.isDestinationValid() || KCDev.TurnInPlace.stoppingCooldownTimer > 0
+};
+
+/**
+ * 
+ * @param {Game_Player} p 
+ * @returns 
+ */
+KCDev.TurnInPlace.shouldAddDelay = function(p) {
+    return p.getInputDirection() !== p.direction();
+};
+
+/**
  * @param {Game_Player} p 
  */
 KCDev.TurnInPlace.handleTimeUntilMoveSetup = function(p) {
-    if ((!KCDev.TurnInPlace.isAppliedWhenDashing && p.isDashing()) ||$gameTemp.isDestinationValid() || KCDev.TurnInPlace.stoppingCooldownTimer > 0) {
+    if (KCDev.TurnInPlace.shouldMoveImmediately(p)) {
         KCDev.TurnInPlace.timeUntilMove = 0;
     }
-    else if (p.getInputDirection() !== p.direction()) {
+    else if (KCDev.TurnInPlace.shouldAddDelay(p)) {
         KCDev.TurnInPlace.timeUntilMove = KCDev.TurnInPlace.delay;
     }
 };
