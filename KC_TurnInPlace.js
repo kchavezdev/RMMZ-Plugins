@@ -27,7 +27,7 @@
  * @url https://github.com/kchavezdev/RMMZ-Plugins
  * @target MZ MV
  *
- * @plugindesc [v1.0] Adds a configurable delay to walking after turning for the player.
+ * @plugindesc [v1.1] Adds a configurable delay to walking after turning for the player.
  * 
  * @param delay
  * @text Delay Frames
