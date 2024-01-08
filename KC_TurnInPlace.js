@@ -87,6 +87,8 @@ KCDev.TurnInPlace.stoppingCooldownTimer = 0;
 
 KCDev.TurnInPlace.stoppingCooldownAmount = 3;
 
+KCDev.TurnInPlace.isAppliedWhenDashing = false;
+
 KCDev.TurnInPlace.decrementTimers = function () {
     if (KCDev.TurnInPlace.timeUntilMove > 0) {
         KCDev.TurnInPlace.timeUntilMove--;
@@ -150,9 +152,10 @@ Game_Player.prototype.update = function () {
     // @ts-ignore
     /**@type {string} */ const script = document.currentScript.src.split("/").pop().replace(/\.js$/, "");
 
-    /**@type {{delay: string, cooldown: string, delaySameDir: string}} */
+    /**@type {{delay: string, cooldown: string, delaySameDir: string, delayDash: string}} */
     const params = PluginManager.parameters(script);
 
     KCDev.TurnInPlace.delay = Number(params.delay) || 0;
     KCDev.TurnInPlace.stoppingCooldownAmount = Number(params.cooldown) || 0;
+    KCDev.TurnInPlace.isAppliedWhenDashing = params.delayDash === 'true';
 }
