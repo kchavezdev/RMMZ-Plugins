@@ -98,6 +98,18 @@ KCDev.TurnInPlace.decrementTimers = function () {
 };
 
 /**
+ * @param {Game_Player} p 
+ */
+KCDev.TurnInPlace.handleTimeUntilMoveSetup = function(p) {
+    if ($gameTemp.isDestinationValid() || KCDev.TurnInPlace.stoppingCooldownTimer > 0) {
+        KCDev.TurnInPlace.timeUntilMove = 0;
+    }
+    else if (p.getInputDirection() !== p.direction()) {
+        KCDev.TurnInPlace.timeUntilMove = KCDev.TurnInPlace.delay;
+    }
+};
+
+/**
  * 
  * @param {Game_Player} p 
  */
@@ -112,17 +124,14 @@ KCDev.TurnInPlace.Game_Player_executeMove = Game_Player.prototype.executeMove;
  * @param {number} direction 
  */
 Game_Player.prototype.executeMove = function (direction) {
-    if ($gameTemp.isDestinationValid() || KCDev.TurnInPlace.stoppingCooldownTimer > 0) {
-        KCDev.TurnInPlace.timeUntilMove = 0;
-    }
-    else if (this.getInputDirection() !== this.direction()) {
-        this.setDirection(direction);
-        KCDev.TurnInPlace.timeUntilMove = KCDev.TurnInPlace.delay;
-    }
+    KCDev.TurnInPlace.handleTimeUntilMoveSetup(this);
 
     if (KCDev.TurnInPlace.timeUntilMove <= 0) {
         // @ts-ignore
         KCDev.TurnInPlace.Game_Player_executeMove.apply(this, arguments);
+    }
+    else {
+        this.setDirection(direction);
     }
 
 };
