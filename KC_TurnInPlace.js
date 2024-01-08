@@ -77,10 +77,11 @@
  *   - Default: False
  * 
  * Changelog:
+ *   v1.1.0 - 2024.01.07
+ *     - Added delay on dash parameter
  *   v1.0.0 - 2024.01.06
  *     - Initial release
  * 
- *   
 */
 
 'use strict';
