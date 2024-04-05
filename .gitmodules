@@ -1,0 +1,4 @@
+[submodule "KC_Mirrors"]
+	path = KC_Mirrors
+	url = https://github.com/kchavezdev/RPGMP_Mirrors
+	branch = main
