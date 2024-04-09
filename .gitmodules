@@ -2,3 +2,7 @@
 	path = KC_Mirrors
 	url = https://github.com/kchavezdev/RPGMP_Mirrors
 	branch = main
+[submodule "KC_MoveRouteTF"]
+	path = KC_MoveRouteTF
+	url = https://github.com/kchavezdev/RPGMP_MoveRouteTransform
+	branch = main
