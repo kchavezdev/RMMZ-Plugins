@@ -6,3 +6,7 @@
 	path = KC_MoveRouteTF
 	url = https://github.com/kchavezdev/RPGMP_MoveRouteTransform
 	branch = main
+[submodule "KC_SkipEvent"]
+	path = KC_SkipEvent
+	url = https://github.com/kchavezdev/RPGMP_SkipEvent
+	branch = main
