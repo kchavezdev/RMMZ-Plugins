@@ -10,3 +10,6 @@
 	path = KC_SkipEvent
 	url = https://github.com/kchavezdev/RPGMP_SkipEvent
 	branch = main
+[submodule "DotMoveSystem_Presets"]
+	path = DotMoveSystem_Presets
+	url = https://github.com/kchavezdev/RPGMP_DotMoveSystem_Presets
