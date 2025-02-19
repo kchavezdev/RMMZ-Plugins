@@ -1,7 +1,7 @@
 /**
  * MIT License
  * 
- * Copyright (c) 2022 K. Chavez <kchavez.dev@gmail.com>
+ * Copyright (c) 2022-2025 K. Chavez <kchavez.dev@gmail.com>
  * 
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -27,30 +27,12 @@
  * @url https://github.com/kchavezdev/RMMZ-Plugins
  * @target MZ MV
  *
- * @plugindesc [v1.1]Play text sound effects based on face graphic.
+ * @plugindesc [v1.1.1]Play text sound effects based on face graphic.
  *
  * @help
  * KC_TextSounds.js
  * 
  * This plugin plays SEs as text is displayed in message boxes.
- * 
- * Changelog:
- *   v1.0.0 - 2022/08/22
- *     - Initial release
- * 
- *   v1.0.1 - 2022/10/14
- *     - Fixed frequency being off by 1
- * 
- *   v1.1.0 - 2022/12/15
- *     - Added \SEPLAY text code to immediately play the currently-loaded text
- *       sound or a preset
- *     - Restructured code to be in-line with current internal
- *       coding practices
- *     - Plugin now always plays an SE on the first character if the
- *       frequency is above 0 or if the frequency is changed mid-message.
- *         + Added a toggle in the parameters to use old behavior for
- *           backwards compatibility.
- *     - Updated plugin help with known compatibility problems
  * 
  * Known Compatibility Issues:
  *   - Message Log VisuStella MZ
@@ -392,6 +374,17 @@ KCDev.TextSounds.generalSound = new KCDev.TextSounds.Text_Sound();
 
 KCDev.TextSounds.useNewFreqBehavior = true;
 
+/** @type {any[]} */
+KCDev.TextSounds.faceConfigs;
+
+KCDev.TextSounds.parseNoError = function (jsonStr) {
+    try {
+        return JSON.parse(jsonStr);
+    } catch (error) {
+        return undefined;
+    }
+};
+
 // handle plugin parameters
 (() => {
 
@@ -405,13 +398,7 @@ KCDev.TextSounds.useNewFreqBehavior = true;
 
     const convertTextSoundParam = KCDev.TextSounds.convertTextSoundParam;
 
-    function parseNoError(jsonStr) {
-        try {
-            return JSON.parse(jsonStr);
-        } catch (error) {
-            return undefined;
-        }
-    }
+    const parseNoError = KCDev.TextSounds.parseNoError;
 
     KCDev.TextSounds.generalSound = convertTextSoundParam(parseNoError(parameters.generalSound));
 
@@ -421,13 +408,23 @@ KCDev.TextSounds.useNewFreqBehavior = true;
     });
 
     // handle face specific configs
-    const /**@type {[]} */ faceConfigs = parseNoError(parameters.faceSetup);
+    KCDev.TextSounds.faceConfigs = parseNoError(parameters.faceSetup) || [];
+
+    KCDev.TextSounds.useNewFreqBehavior = parameters.useOldFreqBehavior !== 'true';
+})();
+
+KCDev.TextSounds.addConfigs = function () {
+    const presets = KCDev.TextSounds.presets;
+
+    const parseNoError = KCDev.TextSounds.parseNoError;
 
     const addConfig = KCDev.TextSounds.addConfig;
 
     const addConfigToEveryIndex = KCDev.TextSounds.addConfigToEveryIndex;
 
-    faceConfigs.forEach(configParam => {
+    const /**@type {[]} */ faceConfigs = KCDev.TextSounds.faceConfigs;
+
+    for (const configParam of faceConfigs) {
         const config = parseNoError(configParam);
         const /**@type {string} */ face = config.face;
         const indexesParam = parseNoError(config.indexes);
@@ -449,10 +446,14 @@ KCDev.TextSounds.useNewFreqBehavior = true;
             // add as load listener to ensure that preset is loaded first
             ImageManager.loadFace(face).addLoadListener(() => addConfig(face, textSound, ...indexes.map(value => parseInt(value))));
         }
-    });
+    }
+};
 
-    KCDev.TextSounds.useNewFreqBehavior = parameters.useOldFreqBehavior !== 'true';
-})();
+KCDev.TextSounds.Scene_Boot_onDatabaseLoaded = Scene_Boot.prototype.onDatabaseLoaded;
+Scene_Boot.prototype.onDatabaseLoaded = function () {
+    KCDev.TextSounds.Scene_Boot_onDatabaseLoaded.apply(this, arguments);
+    KCDev.TextSounds.addConfigs();
+};
 
 KCDev.TextSounds.Game_Message_initialize = Game_Message.prototype.initialize;
 Game_Message.prototype.initialize = function () {
