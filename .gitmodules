@@ -13,3 +13,6 @@
 [submodule "DotMoveSystem_Presets"]
 	path = DotMoveSystem_Presets
 	url = https://github.com/kchavezdev/RPGMP_DotMoveSystem_Presets
+[submodule "KC_TextSounds"]
+	path = KC_TextSounds
+	url = https://github.com/kchavezdev/RPGMP_TextSounds
